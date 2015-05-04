@@ -44,15 +44,23 @@ static int ehci_ci_portpower(struct usb_hcd *hcd, int portnum, bool enable)
 	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
 	struct ehci_ci_priv *priv = (struct ehci_ci_priv *)ehci->priv;
 	struct device *dev = hcd->self.controller;
+	struct ci_hdrc *ci = dev_get_drvdata(dev);
 	int ret = 0;
 	int port = HCS_N_PORTS(ehci->hcs_params);
 
+	if (ci_otg_is_fsm_mode(ci))
+		return 0;
+
+	if (port > 1) {
+		dev_warn(dev,
+			"Not support multi-port regulator control\n");
+		return 0;
+	}
+
+	if (ci->usb_phy && ci->usb_phy->otg)
+		otg_set_vbus(ci->usb_phy->otg, enable);
+
 	if (priv->reg_vbus) {
-		if (port > 1) {
-			dev_warn(dev,
-				"Not support multi-port regulator control\n");
-			return 0;
-		}
 		if (enable)
 			ret = regulator_enable(priv->reg_vbus);
 		else
