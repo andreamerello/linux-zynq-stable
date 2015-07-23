@@ -61,6 +61,10 @@ static int ci_hdrc_usb2_probe(struct platform_device *pdev)
 		*ci_pdata = *(struct ci_hdrc_platform_data *)match->data;
 	}
 
+	match = of_match_device(ci_hdrc_usb2_of_match, &pdev->dev);
+	if (match && match->data)
+		ci_pdata = (struct ci_hdrc_platform_data *)match->data;
+
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
