@@ -277,7 +277,6 @@ static int hw_device_init(struct ci_hdrc *ci, void __iomem *base)
 	dev_dbg(ci->dev,
 		"ChipIdea HDRC found, revision: %d, lpm: %d; cap: %p op: %p\n",
 		ci->rev, ci->hw_bank.lpm, ci->hw_bank.cap, ci->hw_bank.op);
-
 	/* setup lock mode ? */
 
 	/* ENDPTSETUPSTAT is '0' by default */
@@ -977,7 +976,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 		ci->phy = devm_phy_get(dev->parent, "usb-phy");
 		ci->usb_phy = devm_usb_get_phy(dev->parent, USB_PHY_TYPE_USB2);
 
-		if (IS_ERR(ci->phy) && IS_ERR(ci->usb_phy) && 
+		if (IS_ERR(ci->phy) && IS_ERR(ci->usb_phy) &&
 			 ci->platdata->phy_mode == USBPHY_INTERFACE_MODE_ULPI) {
 			ret = ci_hdrc_create_ulpi_phy(dev, ci);
 			if (ret)
