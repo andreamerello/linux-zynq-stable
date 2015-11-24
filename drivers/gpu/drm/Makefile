@@ -62,6 +62,7 @@ obj-$(CONFIG_DRM_ARMADA) += armada/
 obj-$(CONFIG_DRM_ATMEL_HLCDC)	+= atmel-hlcdc/
 obj-$(CONFIG_DRM_RCAR_DU) += rcar-du/
 obj-$(CONFIG_DRM_SHMOBILE) +=shmobile/
+obj-$(CONFIG_DRM_ADI_AXI_HDMI) += adi_axi_hdmi/
 obj-$(CONFIG_DRM_OMAP)	+= omapdrm/
 obj-y			+= tilcdc/
 obj-$(CONFIG_DRM_QXL) += qxl/
