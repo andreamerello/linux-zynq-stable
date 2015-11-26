@@ -43,6 +43,7 @@
 
 &clkc {
 	ps-clk-frequency = <33333333>;
+	fclk-enable = <0xf>;
 };
 
 &gem0 {
