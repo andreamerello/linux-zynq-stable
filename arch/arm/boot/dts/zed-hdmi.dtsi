@@ -1,0 +1,58 @@
+&amba {
+	i2c@41600000 {
+		compatible = "xlnx,axi-iic-1.01.b", "xlnx,xps-iic-2.00.a";
+		interrupt-parent = <0x3>;
+		interrupts = <0x0 0x3a 0x4>;
+		reg = <0x41600000 0x10000>;
+		#size-cells = <0x0>;
+		#address-cells = <0x1>;
+
+		adv7511: adv7511@39 {
+			compatible = "adi,adv7511";
+			reg = <0x39>;
+			adi,input-style = <0x2>;
+			adi,input-depth = <0x8>;
+			adi,input-colorspace = "yuv422";
+			adi,input-justification = "right";
+			adi,up-conversion = <0x0>;
+			adi,clock-delay = <0x3>;
+			adi,input-clock = "1x";
+		};
+
+	};
+
+	axivdma: axivdma@43000000 {
+		compatible = "xlnx,axi-vdma-1.00.a";
+		#address-cells = <0x1>;
+		#size-cells = <0x1>;
+		#dma-cells = <0x1>;
+		#dma-channels = <0x1>;
+		reg = <0x43000000 0x10000>;
+		xlnx,num-fstores = <0x3>;
+		interrupt-parent = <&intc>;
+
+		dma-channel@43000000 {
+			compatible = "xlnx,axi-vdma-mm2s-channel";
+			interrupts = <0x0 0x3b 0x4>;
+			xlnx,datawidth = <0x40>;
+			xlnx,genlock-mode = <0x0>;
+			xlnx,include-dre = <0x0>;
+		};
+	};
+
+	hdmi_clock: axi-clkgen@79000000 {
+		compatible = "adi,axi-clkgen-2.00.a";
+		reg = <0x79000000 0x10000>;
+		#clock-cells = <0x0>;
+		clocks = <&clkc 0x10>;
+	};
+
+	axi-hdmi@70e00000 {
+		compatible = "adi,axi-hdmi-tx-1.00.a";
+		reg = <0x70e00000 0x10000>;
+		encoder-slave = <&adv7511>;
+		dmas = <&axivdma 0x0>;
+		dma-names = "video";
+		clocks = <&hdmi_clock>;
+	};
+};
