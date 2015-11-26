@@ -14,6 +14,9 @@
 /dts-v1/;
 /include/ "zynq-7000.dtsi"
 
+/* include for HDMI on ZED */
+/include/ "zed-hdmi.dtsi"
+
 / {
 	model = "Zynq Zed Development Board";
 	compatible = "xlnx,zynq-zed", "xlnx,zynq-7000";
