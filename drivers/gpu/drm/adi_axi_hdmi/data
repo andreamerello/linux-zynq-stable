@@ -1,0 +1,2 @@
+axi_hdmi_encoder.c:			edid = (struct edid *)connector->edid_blob_ptr->data;
+axi_hdmi_encoder.c~:			edid = (struct edid *)connector->edid_blob_ptr->data;
