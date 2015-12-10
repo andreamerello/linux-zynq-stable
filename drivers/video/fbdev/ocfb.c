@@ -390,6 +390,7 @@ static int ocfb_remove(struct platform_device *pdev)
 	ocfb_writereg(fbdev, OCFB_CTRL, 0);
 
 	platform_set_drvdata(pdev, NULL);
+	framebuffer_release(&fbdev->info);
 
 	return 0;
 }
