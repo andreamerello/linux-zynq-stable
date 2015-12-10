@@ -14,8 +14,16 @@
 /dts-v1/;
 /include/ "zynq-7000.dtsi"
 
-/* include for HDMI on ZED */
+/*
+ * include for HDMI on ZED
+ */
 /include/ "zed-hdmi.dtsi"
+
+/*
+ * include for canotto IP/slave-board
+ *
+ /include/ "zed-canotto.dtsi"
+ */
 
 / {
 	model = "Zynq Zed Development Board";
