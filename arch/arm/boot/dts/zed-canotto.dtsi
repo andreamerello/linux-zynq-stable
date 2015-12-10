@@ -1,0 +1,67 @@
+&amba {
+		canaxiif@43c00000 {
+			compatible = "nxp,sja1000";
+			interrupt-parent = <&intc>;
+			interrupts = <0x0 0x34 0x4>;
+			reg = <0x43c00000 0x10000>;
+			reg-io-width = <0x4>;
+		};
+
+		canaxiif@43c10000 {
+			compatible = "nxp,sja1000";
+			interrupt-parent = <&intc>;
+			interrupts = <0x0 0x24 0x4>;
+			reg = <0x43c10000 0x10000>;
+			reg-io-width = <0x4>;
+		};
+
+		canaxiif@43c20000 {
+			compatible = "nxp,sja1000";
+			interrupt-parent = <&intc>;
+			interrupts = <0x0 0x23 0x4>;
+			reg = <0x43c20000 0x10000>;
+			reg-io-width = <0x4>;
+		};
+
+		canaxiif@43c30000 {
+			compatible = "nxp,sja1000";
+			interrupt-parent = <&intc>;
+			interrupts = <0x0 0x22 0x4>;
+			reg = <0x43c30000 0x10000>;
+			reg-io-width = <0x4>;
+		};
+
+		canaxiif@83c00000 {
+			compatible = "nxp,sja1000";
+			interrupt-parent = <&intc>;
+			interrupts = <0x0 0x21 0x4>;
+			reg = <0x83c00000 0x10000>;
+			reg-io-width = <0x4>;
+		};
+
+		canaxiif@83c10000 {
+			compatible = "nxp,sja1000";
+			interrupt-parent = <&intc>;
+			interrupts = <0x0 0x20 0x4>;
+			reg = <0x83c10000 0x10000>;
+			reg-io-width = <0x4>;
+			iit_ordnum = <0x5>;
+		};
+
+		canaxiif@83c20000 {
+			compatible = "nxp,sja1000";
+			interrupt-parent = <&intc>;
+			interrupts = <0x0 0x1f 0x4>;
+			reg = <0x83c20000 0x10000>;
+			reg-io-width = <0x4>;
+			iit_ordnum = <0x6>;
+		};
+
+		canaxiif@83c30000 {
+			compatible = "nxp,sja1000";
+			interrupt-parent = <&intc>;
+			interrupts = <0x0 0x1e 0x4>;
+			reg = <0x83c30000 0x10000>;
+			reg-io-width = <0x4>;
+		};
+};
