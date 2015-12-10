@@ -1,7 +1,7 @@
 &amba {
 	i2c@41600000 {
 		compatible = "xlnx,axi-iic-1.01.b", "xlnx,xps-iic-2.00.a";
-		interrupt-parent = <0x3>;
+		interrupt-parent = <&intc>;
 		interrupts = <0x0 0x3a 0x4>;
 		reg = <0x41600000 0x10000>;
 		#size-cells = <0x0>;
