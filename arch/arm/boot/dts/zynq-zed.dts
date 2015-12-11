@@ -16,14 +16,21 @@
 
 /*
  * include for HDMI on ZED
+ /include/ "zed-hdmi.dtsi"
  */
-/include/ "zed-hdmi.dtsi"
 
 /*
  * include for canotto IP/slave-board
  *
  /include/ "zed-canotto.dtsi"
  */
+
+/*
+ * include for VGA ocfb-edl IP
+ */
+
+/include/ "zed-ocfb-edl.dtsi"
+
 
 / {
 	model = "Zynq Zed Development Board";
