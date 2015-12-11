@@ -1,0 +1,6 @@
+&amba {
+	ocfb_vga_edl@83c40000 {
+      		compatible = "opencores,ocfb-edl";
+		reg = <0x83c40000 0x10000>;
+	};
+};
