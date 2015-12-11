@@ -47,12 +47,42 @@
 
 #define OCFB_NAME	"OC VGA/LCD"
 
+enum {
+	OCFB_REGULAR,
+	OCFB_EDL
+};
+
 static char *mode_option;
 
-static const struct fb_videomode default_mode = {
+static const struct fb_videomode regular_modes[] = {
 	/* 640x480 @ 60 Hz, 31.5 kHz hsync */
-	NULL, 60, 640, 480, 39721, 40, 24, 32, 11, 96, 2,
-	0, FB_VMODE_NONINTERLACED
+	{ NULL, 60, 640, 480, 39721, 40, 24, 32, 11, 96, 2,
+	0, FB_VMODE_NONINTERLACED }
+};
+
+static const struct fb_videomode edl_modes[] = {
+	/* 8 800x600-60 VESA */
+	{ "800x600@60", 60, 800, 600, 25000, 88, 40, 23, 01, 128, 4,
+	  FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	  FB_VMODE_NONINTERLACED, FB_MODE_IS_VESA },
+
+	/* 13 1024x768-60 VESA */
+	{ "1024x768@60", 60, 1024, 768, 15384, 160, 24, 29, 3, 136, 6,
+	  0, FB_VMODE_NONINTERLACED, FB_MODE_IS_VESA },
+
+	/* 1280x720 @ 60 Hz  -- checkme*/
+	{ "1280x720@60", 60, 1280, 720, 13468, 220, 110, 20,  5,  40, 5,
+	 1, FB_VMODE_NONINTERLACED},
+
+	/* 17 1152x864-75 VESA */
+	{ "1152x864@75", 75, 1152, 864, 9259, 256, 64, 32, 1, 128, 3,
+	  FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+	  FB_VMODE_NONINTERLACED, FB_MODE_IS_VESA },
+
+	/* 20 1280x1024-60 VESA */
+         { "1280x1024@60", 60, 1280, 1024, 9259, 248, 48, 38, 1, 112, 3,
+           FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+           FB_VMODE_NONINTERLACED, FB_MODE_IS_VESA },
 };
 
 struct ocfb_dev {
@@ -64,6 +94,7 @@ struct ocfb_dev {
 	dma_addr_t fb_phys;
 	void __iomem *fb_virt;
 	u32 pseudo_palette[PALETTE_SIZE];
+	int variant;
 };
 
 #ifndef MODULE
@@ -100,6 +131,27 @@ static void ocfb_writereg(struct ocfb_dev *fbdev, loff_t offset, u32 data)
 		iowrite32be(data, fbdev->regs + offset);
 }
 
+/* Calculates pixclk HW magic for EDL ocfb IP variant.
+ * Francesco provided the following HW vs freq xlate table
+ *  HW   freq
+ *  0    40MHz
+ *  1    65MHz
+ *  2    74.25MHz
+ *  3    108MHz
+ */
+static int ocfb_edl_pixclk(u32 pixclock)
+{
+	int i;
+	/*  periods --    40MHz  65MHz 74.25MHz 108MHz */
+	int ip_clks[] = { 25000, 15384, 13841, 9259 };
+	for (i = 0; i < ARRAY_SIZE(ip_clks); i++) {
+		if (abs(ip_clks[i] - pixclock) < 10)
+			return i;
+	}
+	/* IP can't do this.. */
+	return -1;
+}
+
 static int ocfb_setupfb(struct ocfb_dev *fbdev)
 {
 	unsigned long bpp_config;
@@ -107,6 +159,7 @@ static int ocfb_setupfb(struct ocfb_dev *fbdev)
 	struct device *dev = fbdev->info.device;
 	u32 hlen;
 	u32 vlen;
+	u32 pix_clk;
 
 	/* Disable display */
 	ocfb_writereg(fbdev, OCFB_CTRL, 0);
@@ -165,8 +218,18 @@ static int ocfb_setupfb(struct ocfb_dev *fbdev)
 	/* maximum (8) VBL (video memory burst length) */
 	bpp_config |= OCFB_CTRL_VBL8;
 
-	/* Enable output */
-	ocfb_writereg(fbdev, OCFB_CTRL, (OCFB_CTRL_VEN | bpp_config));
+	if (fbdev->variant == OCFB_EDL) {
+		pix_clk = ocfb_edl_pixclk(var->pixclock);
+
+		if (pix_clk < 0) {
+			dev_err(dev, "Requested pixelclock %d is not supported", var->pixclock);
+			return -EINVAL;
+		} else {
+			pix_clk = 0;
+		}
+	}
+	/* Enable output and set pixclk */
+	ocfb_writereg(fbdev, OCFB_CTRL, (OCFB_CTRL_VEN | bpp_config | pix_clk << 30));
 
 	return 0;
 }
@@ -293,12 +356,27 @@ static struct fb_ops ocfb_ops = {
 	.fb_imageblit	= cfb_imageblit,
 };
 
+static struct of_device_id ocfb_match[] = {
+	{
+		.compatible = "opencores,ocfb",
+		.data = (const void*)OCFB_REGULAR
+	}, {
+		.compatible = "opencores,ocfb-edl",
+		.data = (const void*)OCFB_EDL
+	},
+	{},
+};
+MODULE_DEVICE_TABLE(of, ocfb_match);
+
 static int ocfb_probe(struct platform_device *pdev)
 {
-	int ret = 0;
+	int fbsize;
 	struct ocfb_dev *fbdev;
 	struct resource *res;
-	int fbsize;
+	const struct fb_videomode *modes;
+	int modes_len;
+	struct device_node *np = pdev->dev.of_node;
+	int ret = 0;
 
 	fbdev = devm_kzalloc(&pdev->dev, sizeof(*fbdev), GFP_KERNEL);
 	if (!fbdev)
@@ -309,10 +387,20 @@ static int ocfb_probe(struct platform_device *pdev)
 	fbdev->info.fbops = &ocfb_ops;
 	fbdev->info.device = &pdev->dev;
 	fbdev->info.par = fbdev;
+	fbdev->variant = (int)of_match_node(ocfb_match, np)->data;
+
+	if (fbdev->variant == OCFB_EDL) {
+		modes = edl_modes;
+		modes_len = ARRAY_SIZE(edl_modes);
+	} else {
+		/* regular */
+		modes = regular_modes;
+		modes_len = ARRAY_SIZE(regular_modes);
+	}
 
 	/* Video mode setup */
 	if (!fb_find_mode(&fbdev->info.var, &fbdev->info, mode_option,
-			  NULL, 0, &default_mode, 16)) {
+				modes, modes_len, &modes[0], 16)) {
 		dev_err(&pdev->dev, "No valid video modes found\n");
 		return -EINVAL;
 	}
@@ -394,12 +482,6 @@ static int ocfb_remove(struct platform_device *pdev)
 
 	return 0;
 }
-
-static struct of_device_id ocfb_match[] = {
-	{ .compatible = "opencores,ocfb", },
-	{},
-};
-MODULE_DEVICE_TABLE(of, ocfb_match);
 
 static struct platform_driver ocfb_driver = {
 	.probe  = ocfb_probe,
