@@ -154,12 +154,13 @@ static int ocfb_edl_pixclk(u32 pixclock)
 static int ocfb_setupfb(struct fb_info *info)
 {
 	unsigned long bpp_config;
+	int ret;
+	u32 hlen;
+	u32 vlen;
 	struct ocfb_dev *fbdev = (struct ocfb_dev *)info->par;
 	struct fb_var_screeninfo *var = &info->var;
 	struct device *dev = info->device;
-	u32 hlen;
-	u32 vlen;
-	u32 pix_clk;
+	u32 pix_clk = 0;
 
 	/* Disable display */
 	ocfb_writereg(fbdev, OCFB_CTRL, 0);
@@ -219,13 +220,13 @@ static int ocfb_setupfb(struct fb_info *info)
 	bpp_config |= OCFB_CTRL_VBL8;
 
 	if (fbdev->variant == OCFB_EDL) {
-		pix_clk = ocfb_edl_pixclk(var->pixclock);
+		ret = ocfb_edl_pixclk(var->pixclock);
 
-		if (pix_clk < 0) {
+		if (ret < 0) {
 			dev_err(dev, "Requested pixelclock %d is not supported", var->pixclock);
 			return -EINVAL;
 		} else {
-			pix_clk = 0;
+			pix_clk = ret;
 		}
 	}
 	/* Enable output and set pixclk */
