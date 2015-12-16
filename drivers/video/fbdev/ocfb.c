@@ -191,23 +191,23 @@ static int ocfb_setupfb(struct ocfb_dev *fbdev)
 
 	ocfb_writereg(fbdev, OCFB_HVLEN, (hlen - 1) << 16 | (vlen - 1));
 
-	bpp_config = OCFB_CTRL_CD8;
 	switch (var->bits_per_pixel) {
 	case 8:
+		bpp_config = OCFB_CTRL_CD8;
 		if (!var->grayscale)
 			bpp_config |= OCFB_CTRL_PC;  /* enable palette */
 		break;
 
 	case 16:
-		bpp_config |= OCFB_CTRL_CD16;
+		bpp_config = OCFB_CTRL_CD16;
 		break;
 
 	case 24:
-		bpp_config |= OCFB_CTRL_CD24;
+		bpp_config = OCFB_CTRL_CD24;
 		break;
 
 	case 32:
-		bpp_config |= OCFB_CTRL_CD32;
+		bpp_config = OCFB_CTRL_CD32;
 		break;
 
 	default:
