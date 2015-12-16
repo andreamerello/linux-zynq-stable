@@ -456,6 +456,8 @@ static int ocfb_probe(struct platform_device *pdev)
 		goto err_dealloc_cmap;
 	}
 
+	platform_set_drvdata(pdev, info);
+
 	return 0;
 
 err_dealloc_cmap:
