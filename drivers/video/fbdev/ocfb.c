@@ -211,8 +211,8 @@ static int ocfb_setupfb(struct ocfb_dev *fbdev)
 		break;
 
 	default:
-		dev_err(dev, "no bpp specified\n");
-		break;
+		dev_err(dev, "Invalid bpp specified\n");
+		return -EINVAL;
 	}
 
 	/* maximum (8) VBL (video memory burst length) */
