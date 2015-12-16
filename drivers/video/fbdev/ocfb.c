@@ -53,6 +53,7 @@ enum {
 };
 
 static char *mode_option;
+unsigned int vram_size = 1024 * 1280 * 2;
 
 static const struct fb_videomode regular_modes[] = {
 	/* 640x480 @ 60 Hz, 31.5 kHz hsync */
@@ -92,6 +93,7 @@ struct ocfb_dev {
 	/* Physical and virtual addresses of framebuffer */
 	dma_addr_t fb_phys;
 	void __iomem *fb_virt;
+	int fbsize;
 	u32 pseudo_palette[PALETTE_SIZE];
 	int variant;
 };
@@ -151,7 +153,70 @@ static int ocfb_edl_pixclk(u32 pixclock)
 	return -1;
 }
 
-static int ocfb_setupfb(struct fb_info *info)
+static int ocfb_init_fix(struct fb_info *info)
+{
+	struct fb_fix_screeninfo *fix = &info->fix;
+	struct ocfb_dev *fbdev = (struct ocfb_dev *)info->par;
+
+	strcpy(fix->id, OCFB_NAME);
+	fix->accel = FB_ACCEL_NONE;
+	fix->smem_len = fbdev->fbsize;
+	fix->smem_start = fbdev->fb_phys;
+	fix->type = FB_TYPE_PACKED_PIXELS;
+
+	return 0;
+}
+
+static void ocfb_dealloc_fb(struct fb_info *info)
+{
+	struct device *dev = info->device;
+	struct ocfb_dev *fbdev = (struct ocfb_dev *)info->par;
+
+	if (fbdev->fb_virt) {
+		dma_free_coherent(dev, fbdev->fbsize,
+				fbdev->fb_virt, fbdev->fb_phys);
+	}
+	fbdev->fb_virt = NULL;
+}
+
+static int ocfb_setcolreg(unsigned regno, unsigned red, unsigned green,
+			  unsigned blue, unsigned transp,
+			  struct fb_info *info)
+{
+	struct ocfb_dev *fbdev = (struct ocfb_dev *)info->par;
+	u32 color;
+
+	if (regno >= info->cmap.len) {
+		dev_err(info->device, "regno >= cmap.len\n");
+		return 1;
+	}
+
+	if (info->var.grayscale) {
+		/* grayscale = 0.30*R + 0.59*G + 0.11*B */
+		red = green = blue = (red * 77 + green * 151 + blue * 28) >> 8;
+	}
+
+	red >>= (16 - info->var.red.length);
+	green >>= (16 - info->var.green.length);
+	blue >>= (16 - info->var.blue.length);
+	transp >>= (16 - info->var.transp.length);
+
+	if (info->var.bits_per_pixel == 8 && !info->var.grayscale) {
+		regno <<= 2;
+		color = (red << 16) | (green << 8) | blue;
+		ocfb_writereg(fbdev, OCFB_PALETTE + regno, color);
+	} else {
+		((u32 *)(info->pseudo_palette))[regno] =
+			(red << info->var.red.offset) |
+			(green << info->var.green.offset) |
+			(blue << info->var.blue.offset) |
+			(transp << info->var.transp.offset);
+	}
+
+	return 0;
+}
+
+static int ocfb_set_par(struct fb_info *info)
 {
 	unsigned long bpp_config;
 	int ret;
@@ -165,15 +230,15 @@ static int ocfb_setupfb(struct fb_info *info)
 	/* Disable display */
 	ocfb_writereg(fbdev, OCFB_CTRL, 0);
 
-	/* Register framebuffer address */
-	fbdev->little_endian = 0;
-	ocfb_writereg(fbdev, OCFB_VBARA, fbdev->fb_phys);
+	/* Clear framebuffer */
+	memset_io(fbdev->fb_virt, 0, fbdev->fbsize);
 
-	/* Detect endianess */
-	if (ocfb_readreg(fbdev, OCFB_VBARA) != fbdev->fb_phys) {
-		fbdev->little_endian = 1;
-		ocfb_writereg(fbdev, OCFB_VBARA, fbdev->fb_phys);
-	}
+	info->fix.line_length = var->xres * var->bits_per_pixel / 8;
+
+	if (var->bits_per_pixel == 8 && !var->grayscale)
+		info->fix.visual = FB_VISUAL_PSEUDOCOLOR;
+	else
+		info->fix.visual = FB_VISUAL_TRUECOLOR;
 
 	/* Horizontal timings */
 	ocfb_writereg(fbdev, OCFB_HTIM, (var->hsync_len - 1) << 24 |
@@ -229,76 +294,35 @@ static int ocfb_setupfb(struct fb_info *info)
 			pix_clk = ret;
 		}
 	}
+
 	/* Enable output and set pixclk */
 	ocfb_writereg(fbdev, OCFB_CTRL, (OCFB_CTRL_VEN | bpp_config | pix_clk << 30));
 
 	return 0;
 }
 
-static int ocfb_setcolreg(unsigned regno, unsigned red, unsigned green,
-			  unsigned blue, unsigned transp,
-			  struct fb_info *info)
+static int ocfb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 {
+	int req_ram;
 	struct ocfb_dev *fbdev = (struct ocfb_dev *)info->par;
-	u32 color;
 
-	if (regno >= info->cmap.len) {
-		dev_err(info->device, "regno >= cmap.len\n");
-		return 1;
-	}
-
-	if (info->var.grayscale) {
-		/* grayscale = 0.30*R + 0.59*G + 0.11*B */
-		red = green = blue = (red * 77 + green * 151 + blue * 28) >> 8;
-	}
-
-	red >>= (16 - info->var.red.length);
-	green >>= (16 - info->var.green.length);
-	blue >>= (16 - info->var.blue.length);
-	transp >>= (16 - info->var.transp.length);
-
-	if (info->var.bits_per_pixel == 8 && !info->var.grayscale) {
-		regno <<= 2;
-		color = (red << 16) | (green << 8) | blue;
-		ocfb_writereg(fbdev, OCFB_PALETTE + regno, color);
-	} else {
-		((u32 *)(info->pseudo_palette))[regno] =
-			(red << info->var.red.offset) |
-			(green << info->var.green.offset) |
-			(blue << info->var.blue.offset) |
-			(transp << info->var.transp.offset);
-	}
-
-	return 0;
-}
-
-static int ocfb_init_fix(struct fb_info *info)
-{
-	struct fb_var_screeninfo *var = &info->var;
-	struct fb_fix_screeninfo *fix = &info->fix;
-
-	strcpy(fix->id, OCFB_NAME);
-
-	fix->line_length = var->xres * var->bits_per_pixel/8;
-	fix->smem_len = fix->line_length * var->yres;
-	fix->type = FB_TYPE_PACKED_PIXELS;
-
-	if (var->bits_per_pixel == 8 && !var->grayscale)
-		fix->visual = FB_VISUAL_PSEUDOCOLOR;
-	else
-		fix->visual = FB_VISUAL_TRUECOLOR;
-
-	return 0;
-}
-
-static int ocfb_init_var(struct fb_info *info)
-{
-	struct fb_var_screeninfo *var = &info->var;
-
-	var->accel_flags = FB_ACCEL_NONE;
-	var->activate = FB_ACTIVATE_NOW;
+	/* we need our lines to be packed in vram.
+	 * We try to fixup things (also other drivers seems to do things
+	 * like this, even if this make X fail. The alternative is to
+	 * return -EINVAL, that causes failure also).
+	 */
 	var->xres_virtual = var->xres;
-	var->yres_virtual = var->yres;
+	var->xoffset = 0;
+	var->yoffset = 0;
+
+	/* TODO: add check for regular variant */
+	if ((fbdev->variant == OCFB_EDL) &&
+		(ocfb_edl_pixclk(var->pixclock) < 0))
+		return -EINVAL;
+
+	req_ram = var->xres * var->yres_virtual * var->bits_per_pixel / 8;
+	if (req_ram > fbdev->fbsize)
+		return -EINVAL;
 
 	switch (var->bits_per_pixel) {
 	case 8:
@@ -344,6 +368,8 @@ static int ocfb_init_var(struct fb_info *info)
 		var->blue.offset = 0;
 		var->blue.length = 8;
 		break;
+	default:
+		return -EINVAL;
 	}
 
 	return 0;
@@ -355,6 +381,8 @@ static struct fb_ops ocfb_ops = {
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
+	.fb_set_par	= ocfb_set_par,
+	.fb_check_var	= ocfb_check_var,
 };
 
 static struct of_device_id ocfb_match[] = {
@@ -371,7 +399,6 @@ MODULE_DEVICE_TABLE(of, ocfb_match);
 
 static int ocfb_probe(struct platform_device *pdev)
 {
-	int fbsize;
 	struct ocfb_dev *fbdev;
 	struct resource *res;
 	const struct fb_videomode *modes;
@@ -388,8 +415,56 @@ static int ocfb_probe(struct platform_device *pdev)
 
 	info->fbops = &ocfb_ops;
 	info->par = fbdev;
+	info->flags = FBINFO_DEFAULT;
 
 	fbdev->variant = (int)of_match_node(ocfb_match, np)->data;
+	fbdev->fb_virt = NULL;
+
+	/* Request I/O resource */
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res) {
+		dev_err(&pdev->dev, "I/O resource request failed\n");
+		return -ENXIO;
+	}
+	fbdev->regs = devm_ioremap_resource(&pdev->dev, res);
+	if (IS_ERR(fbdev->regs))
+		return PTR_ERR(fbdev->regs);
+
+	/* Allocate framebuffer memory */
+	fbdev->fbsize = PAGE_ALIGN(vram_size);
+	fbdev->fb_virt = dma_alloc_coherent(&pdev->dev, fbdev->fbsize,
+					    &fbdev->fb_phys, GFP_KERNEL);
+	if (!fbdev->fb_virt) {
+		dev_err(&pdev->dev,
+			"Frame buffer memory allocation failed\n");
+		goto err_dma_free;
+	}
+
+	info->screen_base = fbdev->fb_virt;
+	info->screen_size = fbdev->fbsize;
+	info->pseudo_palette = fbdev->pseudo_palette;
+	info->var.activate = FB_ACTIVATE_NOW;
+	/* Register framebuffer address */
+	fbdev->little_endian = 0;
+	ocfb_writereg(fbdev, OCFB_VBARA, fbdev->fb_phys);
+
+	/* Detect endianess */
+	if (ocfb_readreg(fbdev, OCFB_VBARA) != fbdev->fb_phys) {
+		fbdev->little_endian = 1;
+		ocfb_writereg(fbdev, OCFB_VBARA, fbdev->fb_phys);
+	}
+
+	ocfb_init_fix(info);
+
+	if (fbdev->little_endian)
+		info->flags |= FBINFO_FOREIGN_ENDIAN;
+
+	/* Allocate color map */
+	ret = fb_alloc_cmap(&info->cmap, PALETTE_SIZE, 0);
+	if (ret) {
+		dev_err(&pdev->dev, "Color map allocation failed\n");
+		goto err_dma_free;
+	}
 
 	if (fbdev->variant == OCFB_EDL) {
 		modes = edl_modes;
@@ -406,46 +481,18 @@ static int ocfb_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "No valid video modes found\n");
 		return -EINVAL;
 	}
-	ocfb_init_var(info);
-	ocfb_init_fix(info);
 
-	/* Request I/O resource */
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!res) {
-		dev_err(&pdev->dev, "I/O resource request failed\n");
-		return -ENXIO;
-	}
-	fbdev->regs = devm_ioremap_resource(&pdev->dev, res);
-	if (IS_ERR(fbdev->regs))
-		return PTR_ERR(fbdev->regs);
+	info->var.xres_virtual = info->var.xres;
+	info->var.yres_virtual = info->var.yres;
 
-	/* Allocate framebuffer memory */
-	fbsize = info->fix.smem_len;
-	fbdev->fb_virt = dma_alloc_coherent(&pdev->dev, PAGE_ALIGN(fbsize),
-					    &fbdev->fb_phys, GFP_KERNEL);
-	if (!fbdev->fb_virt) {
-		dev_err(&pdev->dev,
-			"Frame buffer memory allocation failed\n");
-		return -ENOMEM;
-	}
-	info->fix.smem_start = fbdev->fb_phys;
-	info->screen_base = fbdev->fb_virt;
-	info->pseudo_palette = fbdev->pseudo_palette;
-
-	/* Clear framebuffer */
-	memset_io(fbdev->fb_virt, 0, fbsize);
-
-	/* Setup and enable the framebuffer */
-	ocfb_setupfb(info);
-
-	if (fbdev->little_endian)
-		info->flags |= FBINFO_FOREIGN_ENDIAN;
-
-	/* Allocate color map */
-	ret = fb_alloc_cmap(&info->cmap, PALETTE_SIZE, 0);
+	ret = ocfb_check_var(&info->var, info);
 	if (ret) {
-		dev_err(&pdev->dev, "Color map allocation failed\n");
-		goto err_dma_free;
+		return ret;
+	}
+	/* Setup and enable the framebuffer */
+	ret = ocfb_set_par(info);
+	if (ret) {
+		return ret;
 	}
 
 	/* Register framebuffer */
@@ -463,8 +510,7 @@ err_dealloc_cmap:
 	fb_dealloc_cmap(&info->cmap);
 
 err_dma_free:
-	dma_free_coherent(&pdev->dev, PAGE_ALIGN(fbsize), fbdev->fb_virt,
-			  fbdev->fb_phys);
+	ocfb_dealloc_fb(info);
 
 	return ret;
 }
@@ -480,9 +526,9 @@ static int ocfb_remove(struct platform_device *pdev)
 	mb();
 
 	unregister_framebuffer(info);
+
 	fb_dealloc_cmap(&info->cmap);
-	dma_free_coherent(&pdev->dev, PAGE_ALIGN(info->fix.smem_len),
-			  fbdev->fb_virt, fbdev->fb_phys);
+	ocfb_dealloc_fb(info);
 
 	platform_set_drvdata(pdev, NULL);
 	framebuffer_release(info);
@@ -526,4 +572,6 @@ MODULE_AUTHOR("Stefan Kristiansson <stefan.kristiansson@saunalahti.fi>");
 MODULE_DESCRIPTION("OpenCores VGA/LCD 2.0 frame buffer driver");
 MODULE_LICENSE("GPL v2");
 module_param(mode_option, charp, 0);
-MODULE_PARM_DESC(mode_option, "Video mode ('<xres>x<yres>[-<bpp>][@refresh]')");
+module_param(vram_size, uint, 0);
+MODULE_PARM_DESC(mode_option, "Initial video mode ('<xres>x<yres>[-<bpp>][@refresh]')");
+MODULE_PARM_DESC(mode_option, "Reserved VRAM");
