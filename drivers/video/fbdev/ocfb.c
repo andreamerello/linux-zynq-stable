@@ -86,7 +86,6 @@ static const struct fb_videomode edl_modes[] = {
 };
 
 struct ocfb_dev {
-	struct fb_info info;
 	void __iomem *regs;
 	/* flag indicating whether the regs are little endian accessed */
 	int little_endian;
@@ -152,11 +151,12 @@ static int ocfb_edl_pixclk(u32 pixclock)
 	return -1;
 }
 
-static int ocfb_setupfb(struct ocfb_dev *fbdev)
+static int ocfb_setupfb(struct fb_info *info)
 {
 	unsigned long bpp_config;
-	struct fb_var_screeninfo *var = &fbdev->info.var;
-	struct device *dev = fbdev->info.device;
+	struct ocfb_dev *fbdev = (struct ocfb_dev *)info->par;
+	struct fb_var_screeninfo *var = &info->var;
+	struct device *dev = info->device;
 	u32 hlen;
 	u32 vlen;
 	u32 pix_clk;
@@ -271,10 +271,10 @@ static int ocfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	return 0;
 }
 
-static int ocfb_init_fix(struct ocfb_dev *fbdev)
+static int ocfb_init_fix(struct fb_info *info)
 {
-	struct fb_var_screeninfo *var = &fbdev->info.var;
-	struct fb_fix_screeninfo *fix = &fbdev->info.fix;
+	struct fb_var_screeninfo *var = &info->var;
+	struct fb_fix_screeninfo *fix = &info->fix;
 
 	strcpy(fix->id, OCFB_NAME);
 
@@ -290,9 +290,9 @@ static int ocfb_init_fix(struct ocfb_dev *fbdev)
 	return 0;
 }
 
-static int ocfb_init_var(struct ocfb_dev *fbdev)
+static int ocfb_init_var(struct fb_info *info)
 {
-	struct fb_var_screeninfo *var = &fbdev->info.var;
+	struct fb_var_screeninfo *var = &info->var;
 
 	var->accel_flags = FB_ACCEL_NONE;
 	var->activate = FB_ACTIVATE_NOW;
@@ -376,17 +376,18 @@ static int ocfb_probe(struct platform_device *pdev)
 	const struct fb_videomode *modes;
 	int modes_len;
 	struct device_node *np = pdev->dev.of_node;
+	struct fb_info *info;
 	int ret = 0;
 
-	fbdev = devm_kzalloc(&pdev->dev, sizeof(*fbdev), GFP_KERNEL);
-	if (!fbdev)
+	info = framebuffer_alloc(sizeof(*fbdev), &pdev->dev);
+	if (!info)
 		return -ENOMEM;
 
-	platform_set_drvdata(pdev, fbdev);
+	fbdev = info->par;
 
-	fbdev->info.fbops = &ocfb_ops;
-	fbdev->info.device = &pdev->dev;
-	fbdev->info.par = fbdev;
+	info->fbops = &ocfb_ops;
+	info->par = fbdev;
+
 	fbdev->variant = (int)of_match_node(ocfb_match, np)->data;
 
 	if (fbdev->variant == OCFB_EDL) {
@@ -399,13 +400,13 @@ static int ocfb_probe(struct platform_device *pdev)
 	}
 
 	/* Video mode setup */
-	if (!fb_find_mode(&fbdev->info.var, &fbdev->info, mode_option,
+	if (!fb_find_mode(&info->var, info, mode_option,
 				modes, modes_len, &modes[0], 16)) {
 		dev_err(&pdev->dev, "No valid video modes found\n");
 		return -EINVAL;
 	}
-	ocfb_init_var(fbdev);
-	ocfb_init_fix(fbdev);
+	ocfb_init_var(info);
+	ocfb_init_fix(info);
 
 	/* Request I/O resource */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -418,7 +419,7 @@ static int ocfb_probe(struct platform_device *pdev)
 		return PTR_ERR(fbdev->regs);
 
 	/* Allocate framebuffer memory */
-	fbsize = fbdev->info.fix.smem_len;
+	fbsize = info->fix.smem_len;
 	fbdev->fb_virt = dma_alloc_coherent(&pdev->dev, PAGE_ALIGN(fbsize),
 					    &fbdev->fb_phys, GFP_KERNEL);
 	if (!fbdev->fb_virt) {
@@ -426,28 +427,28 @@ static int ocfb_probe(struct platform_device *pdev)
 			"Frame buffer memory allocation failed\n");
 		return -ENOMEM;
 	}
-	fbdev->info.fix.smem_start = fbdev->fb_phys;
-	fbdev->info.screen_base = fbdev->fb_virt;
-	fbdev->info.pseudo_palette = fbdev->pseudo_palette;
+	info->fix.smem_start = fbdev->fb_phys;
+	info->screen_base = fbdev->fb_virt;
+	info->pseudo_palette = fbdev->pseudo_palette;
 
 	/* Clear framebuffer */
 	memset_io(fbdev->fb_virt, 0, fbsize);
 
 	/* Setup and enable the framebuffer */
-	ocfb_setupfb(fbdev);
+	ocfb_setupfb(info);
 
 	if (fbdev->little_endian)
-		fbdev->info.flags |= FBINFO_FOREIGN_ENDIAN;
+		info->flags |= FBINFO_FOREIGN_ENDIAN;
 
 	/* Allocate color map */
-	ret = fb_alloc_cmap(&fbdev->info.cmap, PALETTE_SIZE, 0);
+	ret = fb_alloc_cmap(&info->cmap, PALETTE_SIZE, 0);
 	if (ret) {
 		dev_err(&pdev->dev, "Color map allocation failed\n");
 		goto err_dma_free;
 	}
 
 	/* Register framebuffer */
-	ret = register_framebuffer(&fbdev->info);
+	ret = register_framebuffer(info);
 	if (ret) {
 		dev_err(&pdev->dev, "Framebuffer registration failed\n");
 		goto err_dealloc_cmap;
@@ -456,7 +457,7 @@ static int ocfb_probe(struct platform_device *pdev)
 	return 0;
 
 err_dealloc_cmap:
-	fb_dealloc_cmap(&fbdev->info.cmap);
+	fb_dealloc_cmap(&info->cmap);
 
 err_dma_free:
 	dma_free_coherent(&pdev->dev, PAGE_ALIGN(fbsize), fbdev->fb_virt,
@@ -467,18 +468,19 @@ err_dma_free:
 
 static int ocfb_remove(struct platform_device *pdev)
 {
-	struct ocfb_dev *fbdev = platform_get_drvdata(pdev);
+	struct fb_info *info = platform_get_drvdata(pdev);
+	struct ocfb_dev *fbdev = (struct ocfb_dev *)info->par;
 
-	unregister_framebuffer(&fbdev->info);
-	fb_dealloc_cmap(&fbdev->info.cmap);
-	dma_free_coherent(&pdev->dev, PAGE_ALIGN(fbdev->info.fix.smem_len),
+	unregister_framebuffer(info);
+	fb_dealloc_cmap(&info->cmap);
+	dma_free_coherent(&pdev->dev, PAGE_ALIGN(info->fix.smem_len),
 			  fbdev->fb_virt, fbdev->fb_phys);
 
 	/* Disable display */
 	ocfb_writereg(fbdev, OCFB_CTRL, 0);
 
 	platform_set_drvdata(pdev, NULL);
-	framebuffer_release(&fbdev->info);
+	framebuffer_release(info);
 
 	return 0;
 }
