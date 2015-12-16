@@ -471,13 +471,15 @@ static int ocfb_remove(struct platform_device *pdev)
 	struct fb_info *info = platform_get_drvdata(pdev);
 	struct ocfb_dev *fbdev = (struct ocfb_dev *)info->par;
 
+	/* Disable display */
+	ocfb_writereg(fbdev, OCFB_CTRL, 0);
+	/* make sure DMA is stopped before freeing stuff */
+	mb();
+
 	unregister_framebuffer(info);
 	fb_dealloc_cmap(&info->cmap);
 	dma_free_coherent(&pdev->dev, PAGE_ALIGN(info->fix.smem_len),
 			  fbdev->fb_virt, fbdev->fb_phys);
-
-	/* Disable display */
-	ocfb_writereg(fbdev, OCFB_CTRL, 0);
 
 	platform_set_drvdata(pdev, NULL);
 	framebuffer_release(info);
