@@ -16,6 +16,7 @@
 
 /*
  * include for HDMI on ZED
+ *
  /include/ "zed-hdmi.dtsi"
  */
 
@@ -27,9 +28,9 @@
 
 /*
  * include for VGA ocfb-edl IP
+ *
+ /include/ "zed-ocfb-edl.dtsi"
  */
-
-/include/ "zed-ocfb-edl.dtsi"
 
 
 / {
