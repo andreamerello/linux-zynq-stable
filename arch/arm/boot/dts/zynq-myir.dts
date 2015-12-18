@@ -129,6 +129,12 @@
 &i2c0 {
 	status = "okay";
 
+	stlm75@49 {
+		status = "okay";
+		compatible = "lm75";
+		reg = <0x49>;
+	};
+
 	adxl345@53 {
 		compatible = "adi,adxl34x", "adxl34x";
 		reg = <0x53>;
