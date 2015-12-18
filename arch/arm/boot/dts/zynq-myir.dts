@@ -125,3 +125,14 @@
 &can0 {
 	status = "okay";
 };
+
+&i2c0 {
+	status = "okay";
+
+	adxl345@53 {
+		compatible = "adi,adxl34x", "adxl34x";
+		reg = <0x53>;
+		interrupt-parent = <&intc>;
+		interrupts = <0x0 0x1e 0x4>;
+	};
+};
