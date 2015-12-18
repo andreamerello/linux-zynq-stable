@@ -18,7 +18,7 @@
 /include/ "zynq-7000.dtsi"
 
 / {
-	model = "Zynq MYIR Board";
+	model = "Zynq Z-Turn MYIR Board";
 	compatible = "xlnx,zynq-7000";
 
 	aliases {
