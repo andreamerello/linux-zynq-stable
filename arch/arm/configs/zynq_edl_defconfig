@@ -1029,7 +1029,7 @@ CONFIG_PHYLIB=y
 #
 # MII PHY device drivers
 #
-# CONFIG_AT803X_PHY is not set
+CONFIG_AT803X_PHY=y
 # CONFIG_AMD_PHY is not set
 # CONFIG_MARVELL_PHY is not set
 # CONFIG_DAVICOM_PHY is not set
