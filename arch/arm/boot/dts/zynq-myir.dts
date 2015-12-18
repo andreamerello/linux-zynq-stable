@@ -75,7 +75,7 @@
 
 	gpio-beep {
 		compatible = "gpio-beeper";
-		lable = "pl-beep";
+		label = "pl-beep";
 		gpios = <&gpio0 0x75 0x0>;
 	};
 
