@@ -36,7 +36,9 @@
 #define AT803X_INSR				0x0013
 #define AT803X_DEBUG_ADDR			0x1D
 #define AT803X_DEBUG_DATA			0x1E
-#define AT803X_DEBUG_SYSTEM_MODE_CTRL		0x05
+#define AT803X_DEBUG_SYSTEM_MODE_CTRL_RX	0x00
+#define AT803X_DEBUG_RGMII_RX_CLK_DLY		BIT(15)
+#define AT803X_DEBUG_SYSTEM_MODE_CTRL_TX	0x05
 #define AT803X_DEBUG_RGMII_TX_CLK_DLY		BIT(8)
 
 #define ATH8030_PHY_ID 0x004dd076
@@ -217,13 +219,26 @@ static int at803x_config_init(struct phy_device *phydev)
 	if (ret < 0)
 		return ret;
 
-	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_TXID) {
+	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_TXID ||
+		phydev->interface == PHY_INTERFACE_MODE_RGMII_ID) {
 		ret = phy_write(phydev, AT803X_DEBUG_ADDR,
-				AT803X_DEBUG_SYSTEM_MODE_CTRL);
+				AT803X_DEBUG_SYSTEM_MODE_CTRL_TX);
 		if (ret)
 			return ret;
 		ret = phy_write(phydev, AT803X_DEBUG_DATA,
 				AT803X_DEBUG_RGMII_TX_CLK_DLY);
+		if (ret)
+			return ret;
+	}
+
+	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID ||
+		phydev->interface == PHY_INTERFACE_MODE_RGMII_ID) {
+		ret = phy_write(phydev, AT803X_DEBUG_ADDR,
+				AT803X_DEBUG_SYSTEM_MODE_CTRL_RX);
+		if (ret)
+			return ret;
+		ret = phy_write(phydev, AT803X_DEBUG_DATA,
+				AT803X_DEBUG_RGMII_RX_CLK_DLY);
 		if (ret)
 			return ret;
 	}
