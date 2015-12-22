@@ -15,6 +15,12 @@
 #include <linux/dma-mapping.h>
 #include <linux/dmaengine.h>
 
+/* DMA IP masks */
+#define XILINX_DMA_IP_DMA	0x00100000	/* A DMA IP */
+
+/* Device Id in the private structure */
+#define XILINX_DMA_DEVICE_ID_SHIFT	28
+
 /**
  * struct xilinx_vdma_config - VDMA Configuration structure
  * @frm_dly: Frame delay
