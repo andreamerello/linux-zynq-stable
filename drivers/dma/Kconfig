@@ -320,7 +320,7 @@ config MOXART_DMA
 	select DMA_VIRTUAL_CHANNELS
 	help
 	  Enable support for the MOXA ART SoC DMA controller.
- 
+
 	  Say Y here if you enabled MMP ADMA, otherwise say N.
 
 config MPC512X_DMA
@@ -518,6 +518,12 @@ config XILINX_VDMA
 	  Stream Video Protocol.  It has two stream interfaces/
 	  channels, Memory Mapped to Stream (MM2S) and Stream to
 	  Memory Mapped (S2MM) for the data transfers.
+
+config XILINX_AXIDMA
+	tristate "Xilinx AXI DMA Engine"
+	select DMA_ENGINE
+	help
+	  Enable support for Xilinx Axi DMA (memory and device transfer).
 
 config ZX_DMA
 	tristate "ZTE ZX296702 DMA support"
