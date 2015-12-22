@@ -157,30 +157,28 @@
 };
 
 &amba {
-        #address-cells = <1>;
-        #size-cells = <1>;
-        compatible = "simple-bus";
-        ranges ;
-        auxdisp_0: auxdisp@43c00000 {
-                compatible = "iit,auxdisp-1.0";
-                interrupt-parent = <&intc>;
-                interrupts = <0 31 4>;
-                reg = <0x43c00000 0x10000>;
-                /* 109 = 54(offset default for gpio) + 55 */
-                auxdisp-reset = <&gpio0 109 1>;
-        };
+	auxdisp_0: auxdisp@43c00000 {
+		compatible = "iit,auxdisp-1.0";
+		interrupt-parent = <&intc>;
+		interrupts = <0 31 4>;
+		reg = <0x43c00000 0x10000>;
+		/* 109 = 54(offset default for gpio) + 55 */
+		auxdisp-reset = <&gpio0 109 1>;
+		dmas = <&axi_dma_0 0>;
+		dma-names = "mem2dev";
+	};
 
-        axi_dma_0: dma@40400000 {
-                compatible = "xlnx,axi-dma-1.00.a";
-                interrupt-parent = <&intc>;
-                interrupts = <0 29 4>;
-                reg = <0x40400000 0x10000>;
-                xlnx,include-sg ;
-                dma-channel@40400000 {
-                        compatible = "xlnx,axi-dma-mm2s-channel";
-                        interrupts = <0 29 4>;
-                        xlnx,datawidth = <0x20>;
-                        xlnx,device-id = <0x0>;
-                };
-        };
+	axi_dma_0: dma@40400000 {
+		compatible = "xlnx,axi-dma-1.00.a";
+		interrupt-parent = <&intc>;
+		interrupts = <0 29 4>;
+		#dma-cells = <1>;
+		reg = <0x40400000 0x10000>;
+		xlnx,include-sg ;
+		dma-channel@40400000 {
+			compatible = "xlnx,axi-dma-mm2s-channel";
+			interrupts = <0 29 4>;
+			xlnx,datawidth = <0x20>;
+		};
+	};
 };
