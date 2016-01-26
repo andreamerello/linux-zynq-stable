@@ -319,7 +319,7 @@ config MOXART_DMA
 	select DMA_VIRTUAL_CHANNELS
 	help
 	  Enable support for the MOXA ART SoC DMA controller.
- 
+
 	  Say Y here if you enabled MMP ADMA, otherwise say N.
 
 config MPC512X_DMA
@@ -556,6 +556,7 @@ config XILINX_ZYNQMP_DMA
 	help
 	  Enable support for Xilinx ZynqMP DMA controller.
 
+
 config ZX_DMA
 	tristate "ZTE ZX296702 DMA support"
 	depends on ARCH_ZX || COMPILE_TEST
@@ -563,6 +564,12 @@ config ZX_DMA
 	select DMA_VIRTUAL_CHANNELS
 	help
 	  Support the DMA engine for ZTE ZX296702 platform devices.
+
+config XILINX_AXIDMA_TEST
+	tristate "Xilinx AXI DMA TEST"
+	select XILINX_AXIDMA
+	help
+	  Test module for XILINX AXI DMA
 
 
 # driver files
