@@ -1,0 +1,22 @@
+&amba {
+
+	axi_dma_0: dma@40400000 {
+		#dma-cells = <1>;
+		compatible = "xlnx,axi-dma-1.00.a";
+		interrupt-parent = <&intc>;
+		interrupts = <0 29 4>;
+		reg = <0x40400000 0x10000>;
+		dma-channel@40400030 {
+			compatible = "xlnx,axi-dma-s2mm-channel";
+			interrupts = <0 29 4>;
+			xlnx,datawidth = <0x20>;
+		};
+	};
+
+	sigmadelta_0: sigmadelta@43C00000 {
+		reg = <0x43C00000 0x10000>;
+		compatible = "iit,sigmadelta-1.0";
+		dmas = <&axi_dma_0 1>;
+		dma-names = "rx";
+	};
+};
