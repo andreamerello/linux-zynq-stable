@@ -525,9 +525,37 @@ config XILINX_AXIDMA
 	help
 	  Enable support for Xilinx Axi DMA (memory and device transfer).
 
+
 config ZX_DMA
 	tristate "ZTE ZX296702 DMA support"
 	depends on ARCH_ZX
+
+config XILINX_AXIDMA_TEST
+	tristate "Xilinx AXI DMA TEST"
+	select XILINX_AXIDMA
+	help
+	  Test module for XILINX AXI DMA
+
+config DMA_SUN6I
+	tristate "Allwinner A31 SoCs DMA support"
+	depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST
+	depends on RESET_CONTROLLER
+	select DMA_ENGINE
+	select DMA_VIRTUAL_CHANNELS
+	help
+	  Support for the DMA engine first found in Allwinner A31 SoCs.
+
+config NBPFAXI_DMA
+	tristate "Renesas Type-AXI NBPF DMA support"
+	select DMA_ENGINE
+	depends on ARM || COMPILE_TEST
+	help
+	  Support for "Type-AXI" NBPF DMA IPs from Renesas
+
+config IMG_MDC_DMA
+	tristate "IMG MDC support"
+	depends on MIPS || COMPILE_TEST
+	depends on MFD_SYSCON
 	select DMA_ENGINE
 	select DMA_VIRTUAL_CHANNELS
 	help
