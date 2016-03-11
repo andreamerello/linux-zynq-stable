@@ -1,0 +1,16 @@
+Analog Devices SSM2518 audio setup
+
+Required properties:
+
+ - compatible:		Should contain "digilent,ssm2518-sound"
+ - audio-codec:		phandle for the ssm2518 codec
+ - cpu-dai:         phandle for i2c controller of ssm2518 chip
+
+Examples:
+
+    cer_sound {
+        compatible = "digilent,ssm2518-sound";
+        audio-codec = <&ssm2518>;
+        cpu-dai = <&axi_i2s_adi_0>;
+    };
+
