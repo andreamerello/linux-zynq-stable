@@ -19,3 +19,9 @@ config SND_SOC_ADI_AXI_SPDIF
 	select REGMAP_MMIO
 	help
 	  ASoC driver for the Analog Devices AXI-SPDIF softcore peripheral.
+
+config SND_SOC_ADI_SSM2518
+	tristate "Board sound support ssm2518"
+	depends on SND_SOC_ADI
+	depends on I2C
+	select SND_SOC_ADI_AXI_I2S
