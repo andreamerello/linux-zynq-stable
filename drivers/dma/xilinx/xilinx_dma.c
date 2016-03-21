@@ -1206,7 +1206,7 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
 	}
 
 	head_desc = list_first_entry(&chan->pending_list,
-				     struct xilinx_dma_tx_descriptor, node);
+				struct xilinx_dma_tx_descriptor, node);
 	tail_desc = list_last_entry(&chan->pending_list,
 				    struct xilinx_dma_tx_descriptor, node);
 	tail_segment = list_last_entry(&tail_desc->segments,
@@ -1222,6 +1222,11 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
 		/* Swap and save new reserve */
 		list_replace_init(&old_head->node, &new_head->node);
 		chan->seg_v = old_head;
+
+		tail_desc = list_last_entry(&chan->pending_list,
+				    struct xilinx_dma_tx_descriptor, node);
+		tail_segment = list_last_entry(&tail_desc->segments,
+				       struct xilinx_axidma_tx_segment, node);
 
 		tail_segment->hw.next_desc = chan->seg_v->phys;
 		head_desc->async_tx.phys = new_head->phys;
