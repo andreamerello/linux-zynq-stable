@@ -359,8 +359,8 @@ static int xilinx_dma_alloc_chan_resources(struct dma_chan *dchan)
 	{
 		dev_err(chan->dev,
 	        "unable to allocate segment from new descriptor pool\n");
-	    dma_pool_destroy( chan->seg_pool );
-	    chan->seg_pool = NULL;
+		dma_pool_destroy( chan->seg_pool );
+		chan->seg_pool = NULL;
 		return -ENOMEM;
 	}
 
