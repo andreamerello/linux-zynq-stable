@@ -172,8 +172,6 @@ struct xilinx_dma_chan {
 	struct list_head done_list;
 	struct list_head active_list;
 	struct dma_chan common;
-	struct xilinx_dma_tx_segment *seg_v;
-	dma_addr_t seg_p;
 	struct device *dev;
 	int irq;
 	int id;
@@ -1232,7 +1230,6 @@ static int xilinx_dma_terminate_all(struct dma_chan *dchan)
 	/* clear isr for next time */
 	dma_ctrl_write(chan, XILINX_DMA_REG_STATUS,
 		       XILINX_DMA_XR_IRQ_ALL_MASK);
-
 
 	return 0;
 }
