@@ -701,6 +701,7 @@ static void xilinx_dma_free_descriptors(struct xilinx_dma_chan *chan)
 	spin_unlock_irqrestore(&chan->lock, flags);
 }
 
+static int xilinx_dma_terminate_all(struct dma_chan *dchan);
 /**
  * xilinx_dma_free_chan_resources - Free channel resources
  * @dchan: DMA channel
@@ -711,7 +712,7 @@ static void xilinx_dma_free_chan_resources(struct dma_chan *dchan)
 
 	dev_dbg(chan->dev, "Free all channel resources.\n");
 
-	xilinx_dma_free_descriptors(chan);
+	xilinx_dma_terminate_all(&chan->common);
 	if (chan->xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
 		xilinx_dma_free_tx_segment(chan, chan->cyclic_seg_v);
 		xilinx_dma_free_tx_segment(chan, chan->seg_v);
