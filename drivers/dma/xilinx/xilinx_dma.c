@@ -355,10 +355,9 @@ static int xilinx_dma_alloc_chan_resources(struct dma_chan *dchan)
 	BUG_ON( chan->seg_reserve );
 	chan->seg_reserve = xilinx_dma_alloc_tx_segment(chan);
 
-	if ( !chan->seg_reserve )
-	{
+	if (!chan->seg_reserve) {
 		dev_err(chan->dev,
-	        "unable to allocate segment from new descriptor pool\n");
+			"unable to allocate segment from new descriptor pool\n");
 		dma_pool_destroy( chan->seg_pool );
 		chan->seg_pool = NULL;
 		return -ENOMEM;
@@ -960,13 +959,14 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
 	enum dma_transfer_direction direction, unsigned long flags,
 	void *context)
 {
-	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
-	struct xilinx_dma_tx_descriptor *desc;
-	struct xilinx_dma_tx_segment *segment = NULL;
-	u32 *app_w = (u32 *)context;
-	struct scatterlist *sg;
 	size_t copy, sg_used;
 	int i;
+	struct xilinx_dma_tx_descriptor *desc;
+	struct scatterlist *sg;
+	struct xilinx_dma_desc_hw *hw;
+	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
+	struct xilinx_dma_tx_segment *last_segment, *prev_segment, *segment = NULL;
+	u32 *app_w = (u32 *)context;
 
 	if (!is_slave_direction(direction))
 		return NULL;
@@ -986,24 +986,20 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
 
 		/* Loop until the entire scatterlist entry is used */
 		while (sg_used < sg_dma_len(sg)) {
-			struct xilinx_dma_desc_hw *hw;
 
-			/* Get a free segment */
-			{
-				struct xilinx_dma_tx_segment *prev_segment = segment;
+			prev_segment = segment;
+			segment = xilinx_dma_alloc_tx_segment(chan);
+			if (!segment)
+				goto error;
 
-				segment = xilinx_dma_alloc_tx_segment(chan);
-				if (!segment)
-					goto error;
-
-				if ( prev_segment ) {   // link prev -> current
+			/*  link prev -> current */
+			if (prev_segment) {
 #ifdef CONFIG_PHYS_ADDR_T_64BIT
-					prev_segment->hw.next_desc_msb = upper_32_bits(segment->phys);
-					prev_segment->hw.next_desc     = lower_32_bits(segment->phys);
+				prev_segment->hw.next_desc_msb = upper_32_bits(segment->phys);
+				prev_segment->hw.next_desc     = lower_32_bits(segment->phys);
 #else
-					prev_segment->hw.next_desc = segment->phys;
+				prev_segment->hw.next_desc = segment->phys;
 #endif
-				}
 			}
 
 			/*
@@ -1042,21 +1038,17 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
 		}
 	}
 
-	{
-		struct xilinx_dma_tx_segment *last_segment = segment;
+	last_segment = segment;
+	segment = list_first_entry(&desc->segments,
+				struct xilinx_dma_tx_segment, node);
 
-		segment = list_first_entry(&desc->segments,
-					   struct xilinx_dma_tx_segment, node);
-
-		/* Link last segment to first */
+	/* Link last segment to first */
 #ifdef CONFIG_PHYS_ADDR_T_64BIT
-		last_segment->hw.next_desc     = lower_32_bits(segment->phys);
-		last_segment->hw.next_desc_msb = upper_32_bits(segment->phys);
+	last_segment->hw.next_desc     = lower_32_bits(segment->phys);
+	last_segment->hw.next_desc_msb = upper_32_bits(segment->phys);
 #else
-		last_segment->hw.next_desc = segment->phys;
+	last_segment->hw.next_desc = segment->phys;
 #endif
-	}
-
 	desc->async_tx.phys = segment->phys;    // first segment's address
 
 	/* Set SOP and EOP */
@@ -1246,7 +1238,6 @@ static void xilinx_dma_chan_remove(struct xilinx_dma_chan *chan)
 		free_irq(chan->irq, chan);
 
 	tasklet_kill(&chan->tasklet);
-
 	list_del(&chan->common.device_node);
 }
 
