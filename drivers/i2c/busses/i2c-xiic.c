@@ -526,7 +526,10 @@ static int xiic_busy(struct xiic_i2c *i2c)
 		err = xiic_bus_busy(i2c);
 	}
 
-	return err;
+	if (err)
+		return -ETIMEDOUT;
+
+	return 0;
 }
 
 static void xiic_start_recv(struct xiic_i2c *i2c)
@@ -663,6 +666,11 @@ static void __xiic_start_xfer(struct xiic_i2c *i2c)
 static void xiic_start_xfer(struct xiic_i2c *i2c)
 {
 	mutex_lock(&i2c->lock);
+	/* reinit at every transfer looks like a workaroud, however
+	 * this is really needed if we get here after a busy-check timeout.
+	 * If someone removes xiix_reinit(), please explicitly add it on
+	 * the timeout path in xiic_busy()
+	 */
 	xiic_reinit(i2c);
 	__xiic_start_xfer(i2c);
 	mutex_unlock(&i2c->lock);
@@ -677,7 +685,12 @@ static int xiic_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 		xiic_getreg8(i2c, XIIC_SR_REG_OFFSET));
 
 	err = xiic_busy(i2c);
-	if (err)
+
+	/* If we timed out, the transfer has failed. Go on with a new
+	 * trasfer (we actually reinit the IP in xiix_start_xfer) otherwise
+	 * we would be stuck forever.
+	 */
+	if (err && (err != -ETIMEDOUT))
 		return err;
 
 	i2c->tx_msg = msgs;
