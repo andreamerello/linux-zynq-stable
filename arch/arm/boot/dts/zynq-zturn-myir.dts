@@ -140,6 +140,6 @@
 		compatible = "adi,adxl34x", "adxl34x";
 		reg = <0x53>;
 		interrupt-parent = <&intc>;
-		interrupts = <0x0 0x1e 0x4>;
+		//interrupts = <0x0 32 0x4>;
 	};
 };
