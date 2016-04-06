@@ -1,0 +1,63 @@
+
+&i2c1 {
+	clock-frequency = <400000>;
+	status = "okay";
+	mcp7941x: mcp7941x@6f {
+		compatible = "mcp7941x";
+		reg = <0x6f>;
+	};
+};
+
+&amba {
+	axi_iic_isensebd: i2c@41600000 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "xlnx,xps-iic-2.00.a";
+		interrupt-parent = <&intc>;
+		interrupts = <0 30 4>;
+		reg = <0x41600000 0x10000>;
+		adc@068 {
+			compatible = "microchip,mcp3421";
+			reg = <0x68>;
+		};
+	};
+
+	axi_iic_temp: i2c@41610000 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "xlnx,xps-iic-2.00.a";
+		interrupt-parent = <&intc>;
+		interrupts = <0 32 4>;
+		reg = <0x41610000 0x10000>;
+		temp1@48 {
+			compatible = "stts751";
+			reg = <0x48>;
+		};
+		temp2@39 {
+			compatible = "stts751";
+			reg = <0x39>;
+		};
+	};
+
+	axi_iic_vsensebd: i2c@41620000 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "xlnx,xps-iic-2.00.a";
+		interrupt-parent = <&intc>;
+		interrupts = <0 31 4>;
+		reg = <0x41620000 0x10000>;
+		adc@68 {
+			compatible = "microchip,mcp3421";
+			reg = <0x68>;
+		};
+	};
+
+	gcpr: gcpr@43c00000 {
+		compatible = "iit,gcpr-2.0";
+		interrupt-parent = <&intc>;
+		interrupts = <0 29 4>;
+		reg = <0x43c00000 0x10000>;
+		xlnx,num-regs = <0x3>;
+		xlnx,permission-regs = <0x0>;
+	};
+};
