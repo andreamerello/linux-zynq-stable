@@ -23,6 +23,8 @@
 #include <linux/i2c.h>
 #include <linux/i2c-smbus.h>
 #include <linux/slab.h>
+#include <linux/of_irq.h>
+#include <linux/interrupt.h>
 
 struct i2c_smbus_alert {
 	unsigned int		alert_edge_triggered:1;
@@ -137,20 +139,33 @@ static int smbalert_probe(struct i2c_client *ara,
 	struct i2c_smbus_alert_setup *setup = dev_get_platdata(&ara->dev);
 	struct i2c_smbus_alert *alert;
 	struct i2c_adapter *adapter = ara->adapter;
+	struct device_node *of_node = ara->dev.of_node;
 	int res;
+	int irq_type;
 
+	dev_dbg(&ara->dev, "alert probe");
 	alert = devm_kzalloc(&ara->dev, sizeof(struct i2c_smbus_alert),
 			     GFP_KERNEL);
 	if (!alert)
 		return -ENOMEM;
 
-	alert->alert_edge_triggered = setup->alert_edge_triggered;
-	alert->irq = setup->irq;
+	if (setup) {
+		alert->alert_edge_triggered = setup->alert_edge_triggered;
+		alert->irq = setup->irq;
+		dev_dbg(&ara->dev, "plat data");
+	} else if (of_node) {
+		alert->irq = irq_of_parse_and_map(of_node, 0);
+		irq_type = irq_get_trigger_type(alert->irq);
+		alert->alert_edge_triggered = (irq_type & IRQ_TYPE_EDGE_BOTH);
+		dev_dbg(&ara->dev, "using DT data");
+	}
+
+	dev_dbg(&ara->dev, "irq %d", alert->irq);
 	INIT_WORK(&alert->alert, smbus_alert);
 	alert->ara = ara;
 
-	if (setup->irq > 0) {
-		res = devm_request_irq(&ara->dev, setup->irq, smbalert_irq,
+	if (alert->irq > 0) {
+		res = devm_request_irq(&ara->dev, alert->irq, smbalert_irq,
 				       0, "smbus_alert", alert);
 		if (res)
 			return res;
@@ -158,7 +173,7 @@ static int smbalert_probe(struct i2c_client *ara,
 
 	i2c_set_clientdata(ara, alert);
 	dev_info(&adapter->dev, "supports SMBALERT#, %s trigger\n",
-		 setup->alert_edge_triggered ? "edge" : "level");
+		 alert->alert_edge_triggered ? "edge" : "level");
 
 	return 0;
 }

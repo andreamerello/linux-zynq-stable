@@ -1,0 +1,20 @@
+* i2c-smbus extensions
+
+Required Properties:
+  - compatible: Must contain "smbus_alert"
+  - interrupts: The irq line for smbus ALERT signal
+  - reg: I2C slave address. Set to 0x0C (alert response address).
+
+Note: The i2c-smbus module registers itself as a slave I2C device. Whenever
+a smbus controller directly support smbus extensions (and its driver supports
+this), there is no need to add anything special to the DT. Otherwise, for using
+i2c-smbus with any smbus-extensions-unaware I2C controllers, you need to
+route the smbus ALARM signal to an extra IRQ line, thus you need to describe
+this in the DT.
+
+Example:
+	alert@0x0C {
+		reg = <0x0C>;
+		compatible = "smbus_alert";
+		interrupts = <0 36 IRQ_TYPE_LEVEL_LOW>;
+	};
