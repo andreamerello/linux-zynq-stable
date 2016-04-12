@@ -32,6 +32,11 @@
  /include/ "zed-ocfb-edl.dtsi"
  */
 
+/*
+ * include for Glassense on ZED
+ *
+ /include/ "zed-glassense.dtsi"
+ */
 
 / {
 	model = "Zynq Zed Development Board";
