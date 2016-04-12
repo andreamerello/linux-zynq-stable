@@ -79,4 +79,5 @@
 &usb0 {
 	status = "okay";
 	dr_mode = "host";
+	xlnx,phy-reset-gpio = <&gpio0 85 0>;
 };
