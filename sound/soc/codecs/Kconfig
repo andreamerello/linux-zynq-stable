@@ -690,7 +690,7 @@ config SND_SOC_SPDIF
 	tristate "S/PDIF CODEC"
 
 config SND_SOC_SSM2518
-	tristate
+	tristate "Analog Devices SSM2518 CODEC"
 
 config SND_SOC_SSM2602
 	tristate
