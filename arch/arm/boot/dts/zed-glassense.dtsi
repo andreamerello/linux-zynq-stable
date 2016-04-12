@@ -1,0 +1,171 @@
+&amba {
+	i2c@41600000 {
+		compatible = "xlnx,axi-iic-1.01.b", "xlnx,xps-iic-2.00.a";
+		interrupt-parent = <&intc>;
+		interrupts = <0x0 31 0x4>;
+		reg = <0x41600000 0x10000>;
+		#size-cells = <0x0>;
+		#address-cells = <0x1>;
+
+		adv7511: adv7511@39 {
+			compatible = "adi,adv7511";
+			reg = <0x39>;
+			adi,input-style = <0x2>;
+			adi,input-depth = <0x8>;
+			adi,input-colorspace = "yuv422";
+			adi,input-justification = "right";
+			adi,up-conversion = <0x0>;
+			adi,clock-delay = <0x3>;
+			adi,input-clock = "1x";
+		};
+
+	};
+
+	axivdma: axivdma@43000000 {
+		compatible = "xlnx,axi-vdma-1.00.a";
+		#address-cells = <0x1>;
+		#size-cells = <0x1>;
+		#dma-cells = <0x1>;
+		#dma-channels = <0x1>;
+		reg = <0x43000000 0x10000>;
+		xlnx,num-fstores = <0x3>;
+		interrupt-parent = <&intc>;
+
+		dma-channel@43000000 {
+			compatible = "xlnx,axi-vdma-mm2s-channel";
+			interrupts = <0x0 30 0x4>;
+			xlnx,datawidth = <0x40>;
+			xlnx,genlock-mode = <0x0>;
+			xlnx,include-dre = <0x0>;
+		};
+	};
+
+	hdmi_clock: axi-clkgen@43c40000{
+		compatible = "adi,axi-clkgen-2.00.a";
+		reg = <0x43c40000 0x10000>;
+		#clock-cells = <0x0>;
+		clocks = <&clkc 0x10>;
+	};
+
+	axi-hdmi@43c30000 {
+		compatible = "adi,axi-hdmi-tx-1.00.a";
+		reg = <0x43c30000 0x10000>;
+		encoder-slave = <&adv7511>;
+		dmas = <&axivdma 0x0>;
+		dma-names = "video";
+		clocks = <&hdmi_clock>;
+	};
+    axi_spdif_tx_0: axi_spdif_tx@60000000 {
+        compatible = "adi,axi-spdif-tx-1.00.a";
+        reg = <0x60000000 0x10000>;
+        dmas = <&dmac_s 2>;
+        dma-names = "tx";
+        clocks = <&clkc 15>, <&audio_clock>, <&audio_clock>;
+        clock-names = "axi", "ref", "spdif";
+    };
+
+    // For Audio Glassense
+    axi_i2s_adi_0: axi_i2s_adi@43c20000 {
+        compatible = "adi,axi-i2s-1.00.a";
+        reg = <0x43c20000 0x10000>;
+        dmas = <&dmac_s 0 &dmac_s 1>;
+        dma-names = "tx", "rx";
+        clocks = <&clkc 15>, <&audio_clock>; /*, <&audio_clock>; */
+        clock-names = "axi", "ref"; /*, "i2s"; */
+		};
+        
+    audio_clock: audio_clock {
+        compatible = "fixed-clock";
+        #clock-cells = <0>;
+        clock-frequency = <12288000>;
+    };
+           
+    glassense_aux_sound {
+        compatible = "iit,glassense"; 
+        cpu-dai = <&axi_i2s_adi_0>;
+	};
+    
+    // Glassense Beamforming
+    fir_top_0: fir_top@43c00000 {
+        compatible = "iit,glbform-1.0";
+        interrupts = <0 29 4>;
+        interrupt-parent = <&intc>;
+        reg = <0x43c00000 0x10000>;
+        iit.it,burstlen = <0x2>;
+        iit.it,nummics = <0x4>;
+        //   the following are related to miscellaneous
+        iit_enable = <0x43c10000>;
+        iit_ordnum = <0x0>;
+		};
+    miscellaneus_0: miscellaneus@43c10000 {
+        compatible = "iit.it,miscellaneus-1.1";
+        reg = <0x43c10000 0x10000>;
+		};
+	leds {
+		compatible = "gpio-leds";
+		ld0 {
+			label = "ld0:red";
+			gpios = <&gpio0 73 0>;
+            default-state = "on";
+            linux,default-trigger = "cpu0";
+
+		};
+
+		ld1 {
+			label = "ld1:red";
+			gpios = <&gpio0 74 0>;
+            default-state = "on";
+            linux,default-trigger = "cpu1";
+		};
+
+		ld2 {
+			label = "ld2:red";
+			gpios = <&gpio0 75 0>;
+            default-state = "off";
+		};
+
+		ld3 {
+			label = "ld3:red";
+			gpios = <&gpio0 76 0>;
+            default-state = "on";
+            linux,default-trigger = "mmc0";
+		};
+
+		ld4 {
+			label = "ld4:red";
+			gpios = <&gpio0 77 0>;
+            default-state = "off";
+		};
+
+		ld5 {
+			label = "ld5:red";
+			gpios = <&gpio0 78 0>;
+            default-state = "off";
+		};
+
+		ld6 {
+			label = "ld6:red";
+			gpios = <&gpio0 79 0>;
+            default-state = "off";
+		};
+
+		ld7 {
+			label = "ld7:red";
+			gpios = <&gpio0 80 0>;
+            default-state = "on";
+            linux,default-trigger = "heartbeat";
+		};
+	};
+	gpio_keys {
+		compatible = "gpio-keys";
+		#address-cells = <0x1>;
+		#size-cells = <0x0>;
+
+		button_at_1 {
+			label = "Power button virt";
+			linux,code = <0x74>;
+			linux,input-type = <0x1>;
+			gpios = <&gpio0 89 0>;
+		};
+	};
+};
