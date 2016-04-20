@@ -16,7 +16,7 @@
 	sigmadelta_0: sigmadelta@43C00000 {
 		reg = <0x43C00000 0x10000>;
 		compatible = "iit,sigmadelta-1.0";
-		dmas = <&axi_dma_0 1>;
+		dmas = <&axi_dma_0 0>;
 		dma-names = "rx";
 	};
 };
