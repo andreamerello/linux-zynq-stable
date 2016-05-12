@@ -1,0 +1,26 @@
+* STTS751 thermometer.
+
+Required node properties:
+- compatible: "stts751"
+- reg: I2C bus address of the device
+
+Optional properties:
+- has-therm: specifies that the "therm" pin is wired
+- has-event: specifies that the "event" pin is wired
+- therm-hyst: default hyisteresys in milliCelsius for therm
+- therm-val: default threshold in milliCelsius for therm
+- event-max: default max threshold in milliCelsius for event
+- event-min: default min threshold in milliCelsius for event
+
+Example stts751 node:
+
+temp-sensor {
+	compatible = "stts751";
+	reg = <0x48>;
+	has-therm;
+	has-event;
+	therm-hyst = <5000>;
+	therm-val = <650000>;
+	event-max = <900000>;
+	event-min = <-10000>;
+}
