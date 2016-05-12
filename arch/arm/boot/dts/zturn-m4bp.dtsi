@@ -29,13 +29,23 @@
 		interrupt-parent = <&intc>;
 		interrupts = <0 32 4>;
 		reg = <0x41610000 0x10000>;
+
+		alert@0 {
+			reg = <0xc>;
+			compatible = "smbus_alert";
+			interrupts = <0 36 4>;
+		};
+
 		temp1@48 {
 			compatible = "stts751";
+			has-therm;
+			has-event;
 			reg = <0x48>;
 		};
 		temp2@39 {
 			compatible = "stts751";
 			reg = <0x39>;
+			has-therm;
 		};
 	};
 
