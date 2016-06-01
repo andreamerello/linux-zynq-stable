@@ -442,7 +442,7 @@ struct drm_encoder *axi_hdmi_encoder_create(struct drm_device *dev)
 	encoder->possible_crtcs = 1;
 
 	drm_encoder_init(dev, encoder, &axi_hdmi_encoder_funcs,
-			DRM_MODE_ENCODER_TMDS);
+			DRM_MODE_ENCODER_TMDS, NULL);
 	drm_encoder_helper_add(encoder, &axi_hdmi_encoder_helper_funcs);
 
 	encoder_drv =
