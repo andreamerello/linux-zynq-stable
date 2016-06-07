@@ -30,6 +30,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_gpio.h>
+#include <linux/of_device.h>
 #include <linux/regmap.h>
 
 #include <drm/drmP.h>
@@ -99,6 +100,24 @@
 
 #define SIL902X_REG_TPI_RQB			0xc7
 
+struct sii902x_drvdata_t {
+	int max_pixclk;
+	int max_spdif_freq;
+	char *model;
+};
+
+enum {
+	sii9022a,
+};
+
+static struct sii902x_drvdata_t sii902x_drvdata[] = {
+	[sii9022a] = {
+		.max_pixclk = 165000,
+		.max_spdif_freq = 192000,
+		.model = "sii9022a",
+	}
+};
+
 struct sii902x {
 	struct i2c_client *i2c;
 	struct regmap *regmap;
@@ -107,6 +126,7 @@ struct sii902x {
 	struct gpio_desc *reset_gpio;
 	struct work_struct hotplug_work;
 	struct mutex ddc_mutex;
+	struct sii902x_drvdata_t *drvdata;
 };
 
 static inline struct sii902x *bridge_to_sii902x(struct drm_bridge *bridge)
@@ -231,7 +251,14 @@ exit:
 static enum drm_mode_status sii902x_mode_valid(struct drm_connector *connector,
 					       struct drm_display_mode *mode)
 {
-	/* TODO: check mode */
+	struct sii902x *sii902x = connector_to_sii902x(connector);
+
+	if (mode->clock > sii902x->drvdata->max_pixclk)
+		return MODE_CLOCK_HIGH;
+
+	/* Bha, I think old VGA or maybe EGA card used something like this.. */
+	if (mode->clock < 16000)
+		return MODE_CLOCK_LOW;
 
 	return MODE_OK;
 }
@@ -422,6 +449,21 @@ static irqreturn_t sii902x_interrupt(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id sii902x_dt_ids[] = {
+	{ .compatible = "sil,sii9022a", .data = &sii902x_drvdata[sii9022a] },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, sii902x_dt_ids);
+#endif
+
+static const struct i2c_device_id sii902x_i2c_ids[] = {
+	{ "sii9022a", sii9022a },
+	{ },
+};
+MODULE_DEVICE_TABLE(i2c, sii902x_i2c_ids);
+
+
 static int sii902x_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
@@ -430,11 +472,20 @@ static int sii902x_probe(struct i2c_client *client,
 	struct sii902x *sii902x;
 	u8 chipid[4];
 	int ret;
+
 	sii902x = devm_kzalloc(dev, sizeof(*sii902x), GFP_KERNEL);
 	if (!sii902x)
 		return -ENOMEM;
 
 	mutex_init(&sii902x->ddc_mutex);
+
+	if (client->dev.of_node) {
+		sii902x->drvdata =
+			(struct sii902x_drvdata_t*)of_match_device(sii902x_dt_ids,
+							&client->dev)->data;
+	} else {
+		sii902x->drvdata = &sii902x_drvdata[id->driver_data];
+	}
 
 	sii902x->i2c = client;
 	sii902x->regmap = devm_regmap_init_i2c(client, &sii902x_regmap_config);
@@ -491,7 +542,7 @@ static int sii902x_probe(struct i2c_client *client,
 	}
 
 	i2c_set_clientdata(client, sii902x);
-
+	dev_info(dev, "Probed bridge encoder model: %s", sii902x->drvdata->model);
 	return 0;
 }
 
@@ -505,19 +556,6 @@ static int sii902x_remove(struct i2c_client *client)
 	return 0;
 }
 
-#ifdef CONFIG_OF
-static const struct of_device_id sii902x_dt_ids[] = {
-	{ .compatible = "sil,sii9022", },
-	{ }
-};
-MODULE_DEVICE_TABLE(of, sii902x_dt_ids);
-#endif
-
-static const struct i2c_device_id sii902x_i2c_ids[] = {
-	{ "sii9022", 0 },
-	{ },
-};
-MODULE_DEVICE_TABLE(i2c, sii902x_i2c_ids);
 
 static struct i2c_driver sii902x_driver = {
 	.probe = sii902x_probe,
