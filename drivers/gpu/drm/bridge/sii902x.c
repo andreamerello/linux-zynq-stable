@@ -127,6 +127,7 @@ struct sii902x {
 	struct work_struct hotplug_work;
 	struct mutex ddc_mutex;
 	struct sii902x_drvdata_t *drvdata;
+	bool enabled;
 };
 
 static inline struct sii902x *bridge_to_sii902x(struct drm_bridge *bridge)
@@ -194,6 +195,11 @@ static int sii902x_get_modes(struct drm_connector *connector)
 
 	mutex_lock(&sii902x->ddc_mutex);
 
+	ret = regmap_update_bits(sii902x->regmap, SIL902X_SYS_CTRL_DATA,
+			   SIL902X_SYS_CTRL_PWR_DWN, SIL902X_SYS_CTRL_PWR_DWN);
+	if (ret)
+		goto exit;
+
 	ret = regmap_update_bits(regmap, SIL902X_SYS_CTRL_DATA,
 				 SIL902X_SYS_CTRL_DDC_BUS_REQ,
 				 SIL902X_SYS_CTRL_DDC_BUS_REQ);
@@ -224,26 +230,31 @@ static int sii902x_get_modes(struct drm_connector *connector)
 	if (ret)
 		goto exit;
 
+	ret = num;
+exit:
 	regmap_read(regmap, SIL902X_SYS_CTRL_DATA, &status);
 	if (ret)
-		goto exit;
+		goto exit2;
 	ret = regmap_update_bits(regmap, SIL902X_SYS_CTRL_DATA,
 				 SIL902X_SYS_CTRL_DDC_BUS_REQ |
 				 SIL902X_SYS_CTRL_DDC_BUS_GRTD, 0);
 	if (ret)
-		goto exit;
+		goto exit2;
 
 	i = 0;
 	do {
 		ret = regmap_read(regmap, SIL902X_SYS_CTRL_DATA, &status);
 		if (ret)
-			goto exit;
+			goto exit2;
 		i++;
 	} while (status & (SIL902X_SYS_CTRL_DDC_BUS_REQ |
 			   SIL902X_SYS_CTRL_DDC_BUS_GRTD));
 
-	ret = num;
-exit:
+exit2:
+	if (sii902x->enabled)
+		regmap_update_bits(sii902x->regmap, SIL902X_SYS_CTRL_DATA,
+			   SIL902X_SYS_CTRL_PWR_DWN, 0);
+
 	mutex_unlock(&sii902x->ddc_mutex);
 	return ret;
 }
@@ -282,6 +293,7 @@ static void sii902x_bridge_disable(struct drm_bridge *bridge)
 	struct sii902x *sii902x = bridge_to_sii902x(bridge);
 
 	mutex_lock(&sii902x->ddc_mutex);
+	sii902x->enabled = false;
 	regmap_update_bits(sii902x->regmap, SIL902X_SYS_CTRL_DATA,
 			   SIL902X_SYS_CTRL_PWR_DWN,
 			   SIL902X_SYS_CTRL_PWR_DWN);
@@ -293,9 +305,11 @@ static void sii902x_bridge_enable(struct drm_bridge *bridge)
 	struct sii902x *sii902x = bridge_to_sii902x(bridge);
 
 	mutex_lock(&sii902x->ddc_mutex);
+	sii902x->enabled = true;
 	regmap_update_bits(sii902x->regmap, SIL902X_PWR_STATE_CTRL,
 			   SIL902X_AVI_POWER_STATE_MSK,
 			   SIL902X_AVI_POWER_STATE_D(0));
+
 	regmap_update_bits(sii902x->regmap, SIL902X_SYS_CTRL_DATA,
 			   SIL902X_SYS_CTRL_PWR_DWN, 0);
 	mutex_unlock(&sii902x->ddc_mutex);
@@ -316,6 +330,10 @@ static void sii902x_bridge_mode_set(struct drm_bridge *bridge,
 	int ret;
 
 	mutex_lock(&sii902x->ddc_mutex);
+
+	regmap_update_bits(sii902x->regmap, SIL902X_SYS_CTRL_DATA,
+			SIL902X_SYS_CTRL_PWR_DWN, SIL902X_SYS_CTRL_PWR_DWN);
+
 	edid = drm_get_edid(&sii902x->connector, sii902x->i2c->adapter);
 	if (edid) {
 		input_type = edid->input & 0x7;
@@ -371,6 +389,10 @@ static void sii902x_bridge_mode_set(struct drm_bridge *bridge,
 				SIL902X_SYS_CTRL_OUTPUT_MODE,
 				SIL902X_SYS_CTRL_OUTPUT_DVI );
 	}
+
+	if (sii902x->enabled)
+		regmap_update_bits(sii902x->regmap, SIL902X_SYS_CTRL_DATA,
+			SIL902X_SYS_CTRL_PWR_DWN, 0);
 
 exit:
 	mutex_unlock(&sii902x->ddc_mutex);
