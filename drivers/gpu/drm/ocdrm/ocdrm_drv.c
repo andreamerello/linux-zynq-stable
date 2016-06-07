@@ -106,8 +106,8 @@ static void ocdrm_mode_config_init(struct ocdrm_priv *priv)
 	dev->mode_config.min_width = 0;
 	dev->mode_config.min_height = 0;
 
-	dev->mode_config.max_width =  1500;
-	dev->mode_config.max_height = 1500;
+	dev->mode_config.max_width =  4000;
+	dev->mode_config.max_height = 4000;
 
 	dev->mode_config.funcs = &ocdrm_mode_config_funcs;
 }

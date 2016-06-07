@@ -60,7 +60,6 @@ static inline struct ocdrm_priv *plane_to_ocdrm(struct drm_plane *plane)
 	return container_of(plane, struct ocdrm_priv, plane);
 }
 
-
 static void ocdrm_plane_atomic_update(struct drm_plane *plane,
 				struct drm_plane_state *old_state)
 {
@@ -125,7 +124,8 @@ static void ocdrm_crtc_mode_set_nofb(struct drm_crtc *crtc)
 	ocdrm_writereg(priv, OCFB_VTIM, (vsync_len - 1) << 24 |
 		      (vback_porch - 1) << 16 | (m->crtc_vdisplay - 1));
 
-	ocdrm_writereg(priv, OCFB_HVLEN, ((uint32_t)m->crtc_htotal - 1) << 16 | (m->crtc_vtotal - 1));
+	ocdrm_writereg(priv, OCFB_HVLEN, ((uint32_t)m->crtc_htotal - 1) << 16 |
+		(m->crtc_vtotal - 1));
 
 	dev_dbg(priv->drm_dev->dev, "set mode H slen %u, bporch %u, tot %u\n",
 		hsync_len, hback_porch, m->crtc_htotal);
@@ -200,6 +200,10 @@ static bool ocdrm_crtc_mode_fixup(struct drm_crtc *crtc,
 {
 	struct ocdrm_priv *priv = crtc_to_ocdrm(crtc);
 
+	if (mode->clock < 16000 || mode->clock > 165000) {
+		return false;
+	}
+
 	adjusted_mode->clock = clk_round_rate(priv->pixel_clock,
 					mode->clock * 1000) / 1000;
 	return true;
@@ -209,12 +213,20 @@ static int ocdrm_crtc_atomic_check(struct drm_crtc *crtc,
 				struct drm_crtc_state *state)
 {
 	struct ocdrm_priv *priv = crtc_to_ocdrm(crtc);
-	struct drm_display_mode *mode = &state->adjusted_mode;
+	struct drm_display_mode *m = &state->adjusted_mode;
+	uint32_t hsync_len = m->crtc_hsync_end - m->crtc_hsync_start;
+	uint32_t vsync_len = m->crtc_vsync_end - m->crtc_vsync_start;
+	uint32_t vback_porch = m->crtc_vtotal - m->crtc_vsync_end;
+	uint32_t hback_porch = m->crtc_htotal - m->crtc_hsync_end;
 	int rate;
 
-	rate = clk_round_rate(priv->pixel_clock, mode->clock * 1000) / 1000;
+	rate = clk_round_rate(priv->pixel_clock, m->clock * 1000) / 1000;
 
-	if (mode->clock != rate)
+	if (m->clock != rate)
+		return -EINVAL;
+
+	if (hsync_len > 255 || vsync_len > 255 ||
+		vback_porch > 255 || hback_porch > 255)
 		return -EINVAL;
 
 	return 0;
