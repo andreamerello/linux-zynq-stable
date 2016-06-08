@@ -231,18 +231,14 @@ static int sii902x_get_modes(struct drm_connector *connector)
 		goto exit;
 
 exit:
-	ret = regmap_read(regmap, SIL902X_SYS_CTRL_DATA, &status);
-	if (ret)
-		goto exit2;
-
-	ret = regmap_update_bits(regmap, SIL902X_SYS_CTRL_DATA,
-				 SIL902X_SYS_CTRL_DDC_BUS_REQ |
-				 SIL902X_SYS_CTRL_DDC_BUS_GRTD, 0);
-	if (ret)
-		goto exit2;
-
 	i = 0;
 	do {
+		ret = regmap_update_bits(regmap, SIL902X_SYS_CTRL_DATA,
+				 SIL902X_SYS_CTRL_DDC_BUS_REQ |
+				 SIL902X_SYS_CTRL_DDC_BUS_GRTD, 0);
+		if (ret)
+			goto exit2;
+
 		ret = regmap_read(regmap, SIL902X_SYS_CTRL_DATA, &status);
 		if (ret)
 			goto exit2;
