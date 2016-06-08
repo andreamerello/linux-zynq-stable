@@ -66,12 +66,14 @@ static void ocdrm_plane_atomic_update(struct drm_plane *plane,
 	struct drm_gem_cma_object *obj;
 	u32 val;
 	uint32_t pixel_format;
+	int hgate;
 	struct ocdrm_priv *priv = plane_to_ocdrm(plane);
 
 	if (!plane->state->crtc || !plane->state->fb)
 		return;
 
 	pixel_format = plane->state->fb->pixel_format;
+	hgate = plane->state->crtc->state->adjusted_mode.crtc_hdisplay;
 
 	val = ocdrm_readreg(priv, OCFB_CTRL);
 	ocdrm_writereg(priv, OCFB_CTRL, val & ~OCFB_CTRL_VEN);
@@ -81,8 +83,11 @@ static void ocdrm_plane_atomic_update(struct drm_plane *plane,
 		ocdrm_writereg(priv, OCFB_VBARA, obj->paddr);
 
 		val &= ~(OCFB_CTRL_CD8 | OCFB_CTRL_CD16 | OCFB_CTRL_CD24 | OCFB_CTRL_CD32);
+		val &= ~(OCFB_CTRL_VBL8 | OCFB_CTRL_VBL4 | OCFB_CTRL_VBL2 | OCFB_CTRL_VBL1);
+
 		switch (pixel_format) {
 		case DRM_FORMAT_RGB332:
+			hgate /= 4;
 			val |= OCFB_CTRL_CD8;
 			//	if (!var->grayscale)
 #warning TODO
@@ -91,11 +96,13 @@ static void ocdrm_plane_atomic_update(struct drm_plane *plane,
 
 		case DRM_FORMAT_RGB565:
 			dev_dbg(priv->drm_dev->dev, "16 bpp\n");
+			hgate /= 2;
 			val |= OCFB_CTRL_CD16;
 			break;
 
 		case DRM_FORMAT_RGB888:
 			dev_dbg(priv->drm_dev->dev, "24 bpp\n");
+			hgate = hgate * 3 / 4;
 			val |= OCFB_CTRL_CD24;
 			break;
 
@@ -107,6 +114,20 @@ static void ocdrm_plane_atomic_update(struct drm_plane *plane,
 		default:
 			dev_err(priv->drm_dev->dev, "Invalid pixelformat specified\n");
 			return;
+		}
+
+		if ((0 == (obj->paddr & 0x1f)) && (0 == (hgate % 8))) {
+			dev_dbg(priv->drm_dev->dev, "dma burst 8 cycles\n");
+			val |= OCFB_CTRL_VBL8;
+		} else if ((0 == (obj->paddr & 0xf)) && (0 == (hgate % 4))) {
+			dev_dbg(priv->drm_dev->dev, "dma burst 4 cycles\n");
+			val |= OCFB_CTRL_VBL4;
+		} else if ((0 == (obj->paddr & 0x7)) && (0 == (hgate % 2))) {
+			dev_dbg(priv->drm_dev->dev, "dma burst 2 cycles\n");
+			val |= OCFB_CTRL_VBL2;
+		} else {
+			dev_dbg(priv->drm_dev->dev, "dma burst 1 cycle\n");
+			val |= OCFB_CTRL_VBL1;
 		}
 
 		ocdrm_writereg(priv, OCFB_CTRL, val | OCFB_CTRL_VEN);
@@ -179,9 +200,9 @@ static void ocdrm_crtc_mode_set_nofb(struct drm_crtc *crtc)
 		m->flags & DRM_MODE_FLAG_NVSYNC,
 		m->flags & DRM_MODE_FLAG_NHSYNC);
 
-	/* Set maximum (8) VBL (video memory burst length) and sync polarity. */
-	ctrl |= OCFB_CTRL_VBL8;
-	ocdrm_writereg(priv, OCFB_CTRL, ctrl & ~OCFB_CTRL_VEN);
+
+	/* Set sync polarity. */
+	ocdrm_writereg(priv, OCFB_CTRL, ctrl);
 
 	if (priv->clk_enabled) {
 		clk_disable_unprepare(priv->pixel_clock);
