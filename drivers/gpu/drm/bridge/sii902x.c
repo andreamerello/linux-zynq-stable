@@ -230,11 +230,11 @@ static int sii902x_get_modes(struct drm_connector *connector)
 	if (ret)
 		goto exit;
 
-	ret = num;
 exit:
-	regmap_read(regmap, SIL902X_SYS_CTRL_DATA, &status);
+	ret = regmap_read(regmap, SIL902X_SYS_CTRL_DATA, &status);
 	if (ret)
 		goto exit2;
+
 	ret = regmap_update_bits(regmap, SIL902X_SYS_CTRL_DATA,
 				 SIL902X_SYS_CTRL_DDC_BUS_REQ |
 				 SIL902X_SYS_CTRL_DDC_BUS_GRTD, 0);
@@ -256,7 +256,9 @@ exit2:
 			   SIL902X_SYS_CTRL_PWR_DWN, 0);
 
 	mutex_unlock(&sii902x->ddc_mutex);
-	return ret;
+	if (ret)
+		return ret;
+	return num;
 }
 
 static enum drm_mode_status sii902x_mode_valid(struct drm_connector *connector,
