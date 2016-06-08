@@ -65,15 +65,50 @@ static void ocdrm_plane_atomic_update(struct drm_plane *plane,
 {
 	struct drm_gem_cma_object *obj;
 	u32 val;
+	uint32_t pixel_format;
 	struct ocdrm_priv *priv = plane_to_ocdrm(plane);
+
+	if (!plane->state->crtc || !plane->state->fb)
+		return;
+
+	pixel_format = plane->state->fb->pixel_format;
 
 	val = ocdrm_readreg(priv, OCFB_CTRL);
 	ocdrm_writereg(priv, OCFB_CTRL, val & ~OCFB_CTRL_VEN);
 
 	if (!drm_atomic_plane_disabling(plane, plane->state)) {
 		obj = drm_fb_cma_get_gem_obj(plane->state->fb, 0);
-
 		ocdrm_writereg(priv, OCFB_VBARA, obj->paddr);
+
+		val &= ~(OCFB_CTRL_CD8 | OCFB_CTRL_CD16 | OCFB_CTRL_CD24 | OCFB_CTRL_CD32);
+		switch (pixel_format) {
+		case DRM_FORMAT_RGB332:
+			val |= OCFB_CTRL_CD8;
+			//	if (!var->grayscale)
+#warning TODO
+			val |= OCFB_CTRL_PC;  /* enable palette */
+			break;
+
+		case DRM_FORMAT_RGB565:
+			dev_dbg(priv->drm_dev->dev, "16 bpp\n");
+			val |= OCFB_CTRL_CD16;
+			break;
+
+		case DRM_FORMAT_RGB888:
+			dev_dbg(priv->drm_dev->dev, "24 bpp\n");
+			val |= OCFB_CTRL_CD24;
+			break;
+
+		case DRM_FORMAT_XRGB8888:
+			dev_dbg(priv->drm_dev->dev, "32 bpp\n");
+			val |= OCFB_CTRL_CD32;
+			break;
+
+		default:
+			dev_err(priv->drm_dev->dev, "Invalid pixelformat specified\n");
+			return;
+		}
+
 		ocdrm_writereg(priv, OCFB_CTRL, val | OCFB_CTRL_VEN);
 	}
 }
@@ -99,19 +134,17 @@ static void ocdrm_crtc_disable(struct drm_crtc *crtc)
 	priv->clk_enabled = false;
 }
 
+
 static void ocdrm_crtc_mode_set_nofb(struct drm_crtc *crtc)
 {
-	u32 bpp_config;
 	u32 ctrl;
 	int ret;
-	u32 polarity = 0;
 	struct ocdrm_priv *priv = crtc_to_ocdrm(crtc);
 	struct drm_display_mode *m = &crtc->state->adjusted_mode;
 	uint32_t hsync_len = m->crtc_hsync_end - m->crtc_hsync_start;
 	uint32_t vsync_len = m->crtc_vsync_end - m->crtc_vsync_start;
 	uint32_t vback_porch = m->crtc_vtotal - m->crtc_vsync_end;
 	uint32_t hback_porch = m->crtc_htotal - m->crtc_hsync_end;
-	uint32_t pixel_format = crtc->primary->state->fb->pixel_format;
 
 	ctrl = ocdrm_readreg(priv, OCFB_CTRL);
 	ocdrm_writereg(priv, OCFB_CTRL, ctrl & ~OCFB_CTRL_VEN);
@@ -133,47 +166,22 @@ static void ocdrm_crtc_mode_set_nofb(struct drm_crtc *crtc)
 		vsync_len, vback_porch, m->crtc_vtotal);
 
 	if (m->flags & DRM_MODE_FLAG_NHSYNC)
-		polarity |= OCFB_CTRL_HSL;
+		ctrl |= OCFB_CTRL_HSL;
+	else
+		ctrl &= ~OCFB_CTRL_HSL;
+
 	if (m->flags & DRM_MODE_FLAG_NVSYNC)
-		polarity |= OCFB_CTRL_VSL;
+		ctrl |= OCFB_CTRL_VSL;
+	else
+		ctrl &= ~OCFB_CTRL_VSL;
 
 	dev_dbg(priv->drm_dev->dev, "VPOL %d, HPOL %d\n",
 		m->flags & DRM_MODE_FLAG_NVSYNC,
 		m->flags & DRM_MODE_FLAG_NHSYNC);
 
-	switch (pixel_format) {
-	case DRM_FORMAT_RGB332:
-		bpp_config = OCFB_CTRL_CD8;
-		//	if (!var->grayscale)
-#warning TODO
-			bpp_config |= OCFB_CTRL_PC;  /* enable palette */
-		break;
-
-	case DRM_FORMAT_RGB565:
-		dev_dbg(priv->drm_dev->dev, "16 bpp\n");
-		bpp_config = OCFB_CTRL_CD16;
-		break;
-
-	case DRM_FORMAT_RGB888:
-		dev_dbg(priv->drm_dev->dev, "24 bpp\n");
-		bpp_config = OCFB_CTRL_CD24;
-		break;
-
-	case DRM_FORMAT_XRGB8888:
-		dev_dbg(priv->drm_dev->dev, "32 bpp\n");
-		bpp_config = OCFB_CTRL_CD32;
-		break;
-
-	default:
-		dev_err(priv->drm_dev->dev, "Invalid pixelformat specified\n");
-		return;
-	}
-
-	/* Set maximum (8) VBL (video memory burst length).
-	 * Config bpp and sync polarity.
-	 */
-	ctrl &= OCFB_CTRL_VEN;
-	ocdrm_writereg(priv, OCFB_CTRL, OCFB_CTRL_VBL8 | bpp_config | polarity );
+	/* Set maximum (8) VBL (video memory burst length) and sync polarity. */
+	ctrl |= OCFB_CTRL_VBL8;
+	ocdrm_writereg(priv, OCFB_CTRL, ctrl & ~OCFB_CTRL_VEN);
 
 	if (priv->clk_enabled) {
 		clk_disable_unprepare(priv->pixel_clock);
@@ -191,7 +199,8 @@ static void ocdrm_crtc_mode_set_nofb(struct drm_crtc *crtc)
 
 	dev_dbg(priv->drm_dev->dev,"pixel clock: %d\n", m->crtc_clock);
 
-	ocdrm_writereg(priv, OCFB_CTRL, OCFB_CTRL_VBL8 | bpp_config | polarity | ctrl);
+	/* if video was enabled, then enable it */
+	ocdrm_writereg(priv, OCFB_CTRL, ctrl);
 }
 
 static bool ocdrm_crtc_mode_fixup(struct drm_crtc *crtc,
@@ -219,6 +228,10 @@ static int ocdrm_crtc_atomic_check(struct drm_crtc *crtc,
 	uint32_t vback_porch = m->crtc_vtotal - m->crtc_vsync_end;
 	uint32_t hback_porch = m->crtc_htotal - m->crtc_hsync_end;
 	int rate;
+
+	if (m->clock < 16000 || m->clock > 165000) {
+		return false;
+	}
 
 	rate = clk_round_rate(priv->pixel_clock, m->clock * 1000) / 1000;
 
