@@ -182,6 +182,61 @@ static const struct drm_connector_funcs sii902x_connector_funcs = {
 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
 };
 
+#define DDC_SEGMENT_ADDR 0x30
+static int sii902x_do_probe_ddc_edid(void *data, u8 *buf, unsigned int block, size_t len)
+{
+        struct i2c_adapter *adapter = data;
+        unsigned char start = block * EDID_LENGTH;
+        unsigned char segment = block >> 1;
+        unsigned char xfers = segment ? 3 : 2;
+        int ret, retries = 5;
+
+        /*
+         * The core I2C driver will automatically retry the transfer if the
+         * adapter reports EAGAIN. However, we find that bit-banging transfers
+         * are susceptible to errors under a heavily loaded machine and
+         * generate spurious NAKs and timeouts. Retrying the transfer
+         * of the individual block a few times seems to overcome this.
+         */
+        while(1) {
+                struct i2c_msg msgs[] = {
+                        {
+                                .addr   = DDC_SEGMENT_ADDR,
+                                .flags  = 0,
+                                .len    = 1,
+                                .buf    = &segment,
+                        }, {
+                                .addr   = DDC_ADDR,
+                                .flags  = 0,
+                                .len    = 1,
+                                .buf    = &start,
+                        }, {
+                                .addr   = DDC_ADDR,
+                                .flags  = I2C_M_RD,
+                                .len    = len,
+                                .buf    = buf,
+                        }
+                };
+
+                /*
+                 * Avoid sending the segment addr to not upset non-compliant
+                 * DDC monitors.
+                 */
+                ret = i2c_transfer(adapter, &msgs[3 - xfers], xfers);
+
+                if (ret == -ENXIO) {
+                        DRM_DEBUG_KMS("drm: skipping non-existent adapter %s\n",
+                                        adapter->name);
+                        break;
+                }
+		if (ret == xfers || --retries == 0)
+			break;
+
+		udelay(100);
+        }
+
+        return ret == xfers ? 0 : -1;
+}
 static int sii902x_get_modes(struct drm_connector *connector)
 {
 	struct sii902x *sii902x = connector_to_sii902x(connector);
@@ -218,8 +273,20 @@ static int sii902x_get_modes(struct drm_connector *connector)
 	if (ret)
 		goto exit;
 
-	edid = drm_get_edid(connector, sii902x->i2c->adapter);
+	/* drm_get_edid() runs two I2C transfers. The sii902x seems
+	 * to have problem with the 2nd I2C start. A wait seems needed.
+	 * So, we don't perform use drm_get_edid(). We don't perform
+	 * the first "probe" transfer, and we use a custom block read
+	 * function that, in case the trasfer is split, does introduce
+	 * a delay.
+	 */
+	edid = drm_do_get_edid(connector, sii902x_do_probe_ddc_edid,
+			sii902x->i2c->adapter);
+	if (!edid)
+		goto exit;
+
 	drm_mode_connector_update_edid_property(connector, edid);
+
 	if (edid) {
 		num += drm_add_edid_modes(connector, edid);
 		kfree(edid);
