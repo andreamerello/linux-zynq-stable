@@ -399,7 +399,7 @@ static void sii902x_bridge_mode_set(struct drm_bridge *bridge,
 	regmap_update_bits(sii902x->regmap, SIL902X_SYS_CTRL_DATA,
 			SIL902X_SYS_CTRL_PWR_DWN, SIL902X_SYS_CTRL_PWR_DWN);
 
-	edid = drm_get_edid(&sii902x->connector, sii902x->i2c->adapter);
+	edid = (struct edid *)sii902x->connector.edid_blob_ptr->data;
 	if (edid) {
 		input_type = edid->input & 0x7;
 		hdmi = input_type == DRM_EDID_DIGITAL_TYPE_HDMI_A ||
