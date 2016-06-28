@@ -330,7 +330,6 @@ int ocdrm_crtc_create(struct ocdrm_priv *priv)
 					&ocdrm_crtc_funcs, NULL);
 	if (ret)
 		dev_err(priv->drm_dev->dev, "cannot initialize crtc");
-		return ret;
 
-	return 0;
+	return ret;
 }
