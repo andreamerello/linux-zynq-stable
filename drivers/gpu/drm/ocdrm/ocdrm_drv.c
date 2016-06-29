@@ -42,6 +42,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/of.h>
+#include <linux/of_graph.h>
 #include <linux/i2c.h>
 #include <linux/of_address.h>
 #include <linux/of_dma.h>
@@ -55,14 +56,17 @@
 #include <drm/drm_gem_cma_helper.h>
 
 #include "ocdrm_drv.h"
-#include "ocdrm_crtc.h"
-#include "ocdrm_encoder.h"
 
 #define DRIVER_NAME	"ocdrm"
 #define DRIVER_DESC	"OpenCores DRM"
-#define DRIVER_DATE	"20160527"
+#define DRIVER_DATE	"20160629"
 #define DRIVER_MAJOR	1
 #define DRIVER_MINOR	0
+
+static inline struct ocdrm_priv *pipe_to_ocdrm(struct drm_simple_display_pipe *pipe)
+{
+       return container_of(pipe, struct ocdrm_priv, pipe);
+}
 
 static void ocdrm_output_poll_changed(struct drm_device *drm)
 {
@@ -70,19 +74,6 @@ static void ocdrm_output_poll_changed(struct drm_device *drm)
 
 	drm_fbdev_cma_hotplug_event(priv->fbdev);
 }
-
-static int ocdrm_atomic_commit(struct drm_device *dev,
-				    struct drm_atomic_state *state, bool async)
-{
-	return drm_atomic_helper_commit(dev, state, false);
-}
-
-static struct drm_mode_config_funcs ocdrm_mode_config_funcs = {
-	.output_poll_changed = ocdrm_output_poll_changed,
-	.fb_create = drm_fb_cma_create,
-	.atomic_check = drm_atomic_helper_check,
-	.atomic_commit = ocdrm_atomic_commit,
-};
 
 u32 ocdrm_readreg(struct ocdrm_priv *priv, loff_t offset)
 {
@@ -100,6 +91,223 @@ void ocdrm_writereg(struct ocdrm_priv *priv, loff_t offset, u32 data)
 		iowrite32be(data, priv->regs + offset);
 }
 
+static void ocdrm_detect_endian(struct ocdrm_priv *priv)
+{
+	priv->little_endian = false;
+	ocdrm_writereg(priv, OCFB_VBARA, 0xfffffff0);
+	if (ocdrm_readreg(priv, OCFB_VBARA) != 0xfffffff0)
+		priv->little_endian = true;
+
+	ocdrm_writereg(priv, OCFB_VBARA, 0x0);
+}
+
+static void ocdrm_enable(struct drm_simple_display_pipe *pipe,
+			struct drm_crtc_state *crtc_state)
+{
+	u32 ctrl;
+	struct ocdrm_priv *priv = pipe_to_ocdrm(pipe);
+
+	if (!priv->clk_enabled)
+		clk_prepare_enable(priv->pixel_clock);
+	priv->clk_enabled = true;
+
+	ctrl = ocdrm_readreg(priv, OCFB_CTRL);
+	ocdrm_writereg(priv, OCFB_CTRL, ctrl | OCFB_CTRL_VEN);
+}
+
+static void ocdrm_disable(struct drm_simple_display_pipe *pipe)
+{
+	u32 ctrl;
+	struct ocdrm_priv *priv = pipe_to_ocdrm(pipe);
+
+	ctrl = ocdrm_readreg(priv, OCFB_CTRL);
+	ocdrm_writereg(priv, OCFB_CTRL, ctrl & ~OCFB_CTRL_VEN);
+
+	if (priv->clk_enabled)
+		clk_disable_unprepare(priv->pixel_clock);
+	priv->clk_enabled = false;
+}
+
+static void ocdrm_update(struct drm_simple_display_pipe *pipe,
+			struct drm_plane_state *plane_state)
+{
+	struct drm_gem_cma_object *obj;
+	int ret;
+	u32 ctrl;
+	uint32_t pixel_format;
+	int hgate;
+	uint32_t hsync_len;
+	uint32_t vsync_len;
+	uint32_t vback_porch;
+	uint32_t hback_porch;
+	unsigned long clock;
+	struct drm_display_mode *m;
+	struct ocdrm_priv *priv = pipe_to_ocdrm(pipe);
+
+	ctrl = ocdrm_readreg(priv, OCFB_CTRL);
+#if 0
+	if (drm_atomic_plane_disabling(plane, plane->state)) {
+		ocdrm_writereg(priv, OCFB_CTRL, ctrl & ~OCFB_CTRL_VEN);
+		return;
+	}
+#endif
+	if (!plane_state->crtc || !plane_state->fb)
+		return;
+
+	ocdrm_writereg(priv, OCFB_CTRL, ctrl & ~OCFB_CTRL_VEN);
+
+	m = &plane_state->crtc->state->adjusted_mode;
+	hsync_len = m->crtc_hsync_end - m->crtc_hsync_start;
+	vsync_len = m->crtc_vsync_end - m->crtc_vsync_start;
+	vback_porch = m->crtc_vtotal - m->crtc_vsync_end;
+	hback_porch = m->crtc_htotal - m->crtc_hsync_end;
+	hgate = m->crtc_hdisplay;
+	pixel_format = plane_state->fb->pixel_format;
+
+	obj = drm_fb_cma_get_gem_obj(plane_state->fb, 0);
+	ocdrm_writereg(priv, OCFB_VBARA, obj->paddr);
+
+	ctrl &= ~(OCFB_CTRL_CD8 | OCFB_CTRL_CD16 |
+		OCFB_CTRL_CD24 | OCFB_CTRL_CD32);
+	ctrl &= ~(OCFB_CTRL_VBL8 | OCFB_CTRL_VBL4 |
+		OCFB_CTRL_VBL2 | OCFB_CTRL_VBL1);
+
+	switch (pixel_format) {
+		/* TODO
+		 *case DRM_FORMAT_RGB332:
+		 *	hgate /= 4;
+		 *	val |= OCFB_CTRL_CD8;
+		 *	val |= OCFB_CTRL_PC;
+		 *	break;
+		 */
+
+	case DRM_FORMAT_RGB565:
+		dev_dbg(priv->drm_dev->dev, "16 bpp\n");
+		hgate /= 2;
+		ctrl |= OCFB_CTRL_CD16;
+		break;
+
+	case DRM_FORMAT_RGB888:
+		dev_dbg(priv->drm_dev->dev, "24 bpp\n");
+		hgate = hgate * 3 / 4;
+		ctrl |= OCFB_CTRL_CD24;
+		break;
+
+	case DRM_FORMAT_XRGB8888:
+		dev_dbg(priv->drm_dev->dev, "32 bpp\n");
+		ctrl |= OCFB_CTRL_CD32;
+		break;
+
+	default:
+		dev_err(priv->drm_dev->dev, "Invalid pixelformat specified\n");
+		return;
+	}
+
+	if ((0 == (obj->paddr & 0x1f)) && (0 == (hgate % 8))) {
+		dev_dbg(priv->drm_dev->dev, "dma burst 8 cycles\n");
+		ctrl |= OCFB_CTRL_VBL8;
+	} else if ((0 == (obj->paddr & 0xf)) && (0 == (hgate % 4))) {
+		dev_dbg(priv->drm_dev->dev, "dma burst 4 cycles\n");
+		ctrl |= OCFB_CTRL_VBL4;
+	} else if ((0 == (obj->paddr & 0x7)) && (0 == (hgate % 2))) {
+		dev_dbg(priv->drm_dev->dev, "dma burst 2 cycles\n");
+		ctrl |= OCFB_CTRL_VBL2;
+	} else {
+		dev_dbg(priv->drm_dev->dev, "dma burst 1 cycle\n");
+		ctrl |= OCFB_CTRL_VBL1;
+	}
+
+	/* Horizontal timings */
+	ocdrm_writereg(priv, OCFB_HTIM, (hsync_len - 1) << 24 |
+		      (hback_porch - 1) << 16 | (m->crtc_hdisplay - 1));
+
+	/* Vertical timings */
+	ocdrm_writereg(priv, OCFB_VTIM, (vsync_len - 1) << 24 |
+		      (vback_porch - 1) << 16 | (m->crtc_vdisplay - 1));
+
+	ocdrm_writereg(priv, OCFB_HVLEN, ((uint32_t)m->crtc_htotal - 1) << 16 |
+		(m->crtc_vtotal - 1));
+
+	dev_dbg(priv->drm_dev->dev, "set mode H slen %u, bporch %u, tot %u\n",
+		hsync_len, hback_porch, m->crtc_htotal);
+	dev_dbg(priv->drm_dev->dev, "set mode V slen %u, bporch %u, tot %u\n",
+		vsync_len, vback_porch, m->crtc_vtotal);
+
+	if (m->flags & DRM_MODE_FLAG_NHSYNC)
+		ctrl |= OCFB_CTRL_HSL;
+	else
+		ctrl &= ~OCFB_CTRL_HSL;
+
+	if (m->flags & DRM_MODE_FLAG_NVSYNC)
+		ctrl |= OCFB_CTRL_VSL;
+	else
+		ctrl &= ~OCFB_CTRL_VSL;
+
+	dev_dbg(priv->drm_dev->dev, "VPOL %d, HPOL %d\n",
+		m->flags & DRM_MODE_FLAG_NVSYNC,
+		m->flags & DRM_MODE_FLAG_NHSYNC);
+
+	/* Set sync polarity. */
+	ocdrm_writereg(priv, OCFB_CTRL, ctrl);
+
+	if (priv->clk_enabled)
+		clk_disable_unprepare(priv->pixel_clock);
+
+	clock = clk_round_rate(priv->pixel_clock,
+					m->clock * 1000);
+
+	dev_dbg(priv->drm_dev->dev, "pixel clock: %u, rounded to %lu\n",
+		m->clock, clock);
+
+	ret = clk_set_rate(priv->pixel_clock, clock);
+	if (ret) {
+		dev_err(priv->drm_dev->dev, "failed to set pixclk %d\n", ret);
+		return;
+	}
+
+	if (priv->clk_enabled) {
+		clk_prepare_enable(priv->pixel_clock);
+	}
+
+	/* if video was enabled, then re-enable it */
+	ocdrm_writereg(priv, OCFB_CTRL, ctrl);
+}
+
+
+static int ocdrm_check(struct drm_simple_display_pipe *pipe,
+		     struct drm_plane_state *plane_state,
+		     struct drm_crtc_state *crtc_state)
+{
+	struct ocdrm_priv *priv = pipe_to_ocdrm(pipe);
+	struct drm_display_mode *m = &crtc_state->adjusted_mode;
+	uint32_t hsync_len = m->crtc_hsync_end - m->crtc_hsync_start;
+	uint32_t vsync_len = m->crtc_vsync_end - m->crtc_vsync_start;
+	uint32_t vback_porch = m->crtc_vtotal - m->crtc_vsync_end;
+	uint32_t hback_porch = m->crtc_htotal - m->crtc_hsync_end;
+	int rate;
+
+	if (m->clock < 16000 || m->clock > 165000)
+		return false;
+
+	rate = clk_round_rate(priv->pixel_clock, m->clock * 1000) / 1000;
+
+	if (m->clock != rate)
+		return -EINVAL;
+
+	if (hsync_len > 255 || vsync_len > 255 ||
+		vback_porch > 255 || hback_porch > 255)
+		return -EINVAL;
+
+	return 0;
+}
+
+static struct drm_mode_config_funcs ocdrm_mode_config_funcs = {
+	.output_poll_changed	= ocdrm_output_poll_changed,
+	.fb_create		= drm_fb_cma_create,
+	.atomic_check		= drm_atomic_helper_check,
+	.atomic_commit		= drm_atomic_helper_commit,
+};
+
 static void ocdrm_mode_config_init(struct ocdrm_priv *priv)
 {
 	struct drm_device *dev = priv->drm_dev;
@@ -113,22 +321,26 @@ static void ocdrm_mode_config_init(struct ocdrm_priv *priv)
 	dev->mode_config.funcs = &ocdrm_mode_config_funcs;
 }
 
-static void ocdrm_detect_endian(struct ocdrm_priv *priv)
-{
-	priv->little_endian = false;
-	ocdrm_writereg(priv, OCFB_VBARA, 0xfffffff0);
-	if (ocdrm_readreg(priv, OCFB_VBARA) != 0xfffffff0)
-		priv->little_endian = true;
-
-	ocdrm_writereg(priv, OCFB_VBARA, 0x0);
-}
+static struct drm_simple_display_pipe_funcs ocdrm_pipe_funcs = {
+	.enable		= ocdrm_enable,
+	.disable	= ocdrm_disable,
+	.check		= ocdrm_check,
+	.update		= ocdrm_update,
+};
 
 static int ocdrm_load(struct drm_device *dev)
 {
 	struct ocdrm_priv *priv;
 	int ret;
 	struct resource *res;
+	struct drm_bridge *bridge;
+	struct device_node *ep, *bridge_node;
 	struct platform_device *pdev = to_platform_device(dev->dev);
+	uint32_t ocdrm_formats[] = {
+		DRM_FORMAT_RGB565,
+		DRM_FORMAT_RGB888,
+		DRM_FORMAT_XRGB8888,
+	};
 
 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
@@ -153,13 +365,22 @@ static int ocdrm_load(struct drm_device *dev)
 	drm_mode_config_init(dev);
 	ocdrm_mode_config_init(priv);
 
-	ret = ocdrm_crtc_create(priv);
-	if (ret)
-		goto err_crtc;
+	drm_simple_display_pipe_init(dev, &priv->pipe, &ocdrm_pipe_funcs,
+				ocdrm_formats, ARRAY_SIZE(ocdrm_formats), NULL);
 
-	ret = ocdrm_encoder_create(priv);
-	if (ret)
-		goto err_crtc;
+	ep = of_graph_get_next_endpoint(priv->drm_dev->dev->of_node, NULL);
+	if (!ep)
+		return -ENODEV;
+
+	bridge_node = of_graph_get_remote_port_parent(ep);
+	if (!bridge_node)
+		return -ENODEV;
+
+	bridge = of_drm_find_bridge(bridge_node);
+	if (!bridge)
+		return -EPROBE_DEFER;
+
+	drm_simple_display_pipe_attach_bridge(&priv->pipe, bridge);
 
 	drm_mode_config_reset(dev);
 	drm_kms_helper_poll_init(dev);

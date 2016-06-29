@@ -43,6 +43,7 @@
 
 #include <drm/drm.h>
 #include <drm/drm_fb_cma_helper.h>
+#include <drm/drm_simple_kms_helper.h>
 #include <linux/of.h>
 #include <linux/clk.h>
 
@@ -77,6 +78,7 @@ struct ocdrm_priv {
 	struct drm_crtc crtc;
 	struct drm_plane plane;
 	struct drm_encoder encoder;
+	struct drm_simple_display_pipe pipe;
 	struct clk *pixel_clock;
 	bool clk_enabled;
 	void __iomem *regs;
