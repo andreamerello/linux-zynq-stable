@@ -289,11 +289,6 @@ static int ocdrm_check(struct drm_simple_display_pipe *pipe,
 	if (m->clock < 16000 || m->clock > 165000)
 		return false;
 
-	rate = clk_round_rate(priv->pixel_clock, m->clock * 1000) / 1000;
-
-	if (m->clock != rate)
-		return -EINVAL;
-
 	if (hsync_len > 255 || vsync_len > 255 ||
 		vback_porch > 255 || hback_porch > 255)
 		return -EINVAL;
