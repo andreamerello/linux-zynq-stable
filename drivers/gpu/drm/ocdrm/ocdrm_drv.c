@@ -278,13 +278,11 @@ static int ocdrm_check(struct drm_simple_display_pipe *pipe,
 		     struct drm_plane_state *plane_state,
 		     struct drm_crtc_state *crtc_state)
 {
-	struct ocdrm_priv *priv = pipe_to_ocdrm(pipe);
 	struct drm_display_mode *m = &crtc_state->adjusted_mode;
 	uint32_t hsync_len = m->crtc_hsync_end - m->crtc_hsync_start;
 	uint32_t vsync_len = m->crtc_vsync_end - m->crtc_vsync_start;
 	uint32_t vback_porch = m->crtc_vtotal - m->crtc_vsync_end;
 	uint32_t hback_porch = m->crtc_htotal - m->crtc_hsync_end;
-	int rate;
 
 	if (m->clock < 16000 || m->clock > 165000)
 		return false;
