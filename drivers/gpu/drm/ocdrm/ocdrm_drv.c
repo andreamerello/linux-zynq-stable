@@ -101,6 +101,17 @@ static void ocdrm_detect_endian(struct ocdrm_priv *priv)
 	ocdrm_writereg(priv, OCFB_VBARA, 0x0);
 }
 
+static void ocdrm_send_vblank_event(struct drm_crtc *crtc)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&crtc->dev->event_lock, flags);
+	if (crtc->state->event)
+		drm_crtc_send_vblank_event(crtc, crtc->state->event);
+	crtc->state->event = NULL;
+	spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
+}
+
 static void ocdrm_enable(struct drm_simple_display_pipe *pipe,
 			struct drm_crtc_state *crtc_state)
 {
@@ -143,136 +154,134 @@ static void ocdrm_update(struct drm_simple_display_pipe *pipe,
 	unsigned long clock;
 	struct drm_display_mode *m;
 	struct ocdrm_priv *priv = pipe_to_ocdrm(pipe);
+	struct drm_crtc *crtc = plane_state->crtc;
 
 	ctrl = ocdrm_readreg(priv, OCFB_CTRL);
-#if 0
-	if (drm_atomic_plane_disabling(plane, plane->state)) {
+
+	if (drm_atomic_plane_disabling(plane_state->plane, plane_state)) {
 		ocdrm_writereg(priv, OCFB_CTRL, ctrl & ~OCFB_CTRL_VEN);
-		return;
+	} else	if (crtc && plane_state->fb) {
+		ocdrm_writereg(priv, OCFB_CTRL, ctrl & ~OCFB_CTRL_VEN);
+
+		m = &crtc->state->adjusted_mode;
+		hsync_len = m->crtc_hsync_end - m->crtc_hsync_start;
+		vsync_len = m->crtc_vsync_end - m->crtc_vsync_start;
+		vback_porch = m->crtc_vtotal - m->crtc_vsync_end;
+		hback_porch = m->crtc_htotal - m->crtc_hsync_end;
+		hgate = m->crtc_hdisplay;
+		pixel_format = plane_state->fb->pixel_format;
+
+		obj = drm_fb_cma_get_gem_obj(plane_state->fb, 0);
+		ocdrm_writereg(priv, OCFB_VBARA, obj->paddr);
+
+		ctrl &= ~(OCFB_CTRL_CD8 | OCFB_CTRL_CD16 |
+			OCFB_CTRL_CD24 | OCFB_CTRL_CD32);
+		ctrl &= ~(OCFB_CTRL_VBL8 | OCFB_CTRL_VBL4 |
+			OCFB_CTRL_VBL2 | OCFB_CTRL_VBL1);
+
+		switch (pixel_format) {
+			/* TODO
+			 *case DRM_FORMAT_RGB332:
+			 *	hgate /= 4;
+			 *	val |= OCFB_CTRL_CD8;
+			 *	val |= OCFB_CTRL_PC;
+			 *	break;
+			 */
+
+		case DRM_FORMAT_RGB565:
+			dev_dbg(priv->drm_dev->dev, "16 bpp\n");
+			hgate /= 2;
+			ctrl |= OCFB_CTRL_CD16;
+			break;
+
+		case DRM_FORMAT_RGB888:
+			dev_dbg(priv->drm_dev->dev, "24 bpp\n");
+			hgate = hgate * 3 / 4;
+			ctrl |= OCFB_CTRL_CD24;
+			break;
+
+		case DRM_FORMAT_XRGB8888:
+			dev_dbg(priv->drm_dev->dev, "32 bpp\n");
+			ctrl |= OCFB_CTRL_CD32;
+			break;
+
+		default:
+			dev_err(priv->drm_dev->dev, "Invalid pixelformat specified\n");
+			return;
+		}
+
+		if ((0 == (obj->paddr & 0x1f)) && (0 == (hgate % 8))) {
+			dev_dbg(priv->drm_dev->dev, "dma burst 8 cycles\n");
+			ctrl |= OCFB_CTRL_VBL8;
+		} else if ((0 == (obj->paddr & 0xf)) && (0 == (hgate % 4))) {
+			dev_dbg(priv->drm_dev->dev, "dma burst 4 cycles\n");
+			ctrl |= OCFB_CTRL_VBL4;
+		} else if ((0 == (obj->paddr & 0x7)) && (0 == (hgate % 2))) {
+			dev_dbg(priv->drm_dev->dev, "dma burst 2 cycles\n");
+			ctrl |= OCFB_CTRL_VBL2;
+		} else {
+			dev_dbg(priv->drm_dev->dev, "dma burst 1 cycle\n");
+			ctrl |= OCFB_CTRL_VBL1;
+		}
+
+		/* Horizontal timings */
+		ocdrm_writereg(priv, OCFB_HTIM, (hsync_len - 1) << 24 |
+			(hback_porch - 1) << 16 | (m->crtc_hdisplay - 1));
+
+		/* Vertical timings */
+		ocdrm_writereg(priv, OCFB_VTIM, (vsync_len - 1) << 24 |
+			(vback_porch - 1) << 16 | (m->crtc_vdisplay - 1));
+
+		ocdrm_writereg(priv, OCFB_HVLEN, ((uint32_t)m->crtc_htotal - 1) << 16 |
+			(m->crtc_vtotal - 1));
+
+		dev_dbg(priv->drm_dev->dev, "set mode H slen %u, bporch %u, tot %u\n",
+			hsync_len, hback_porch, m->crtc_htotal);
+		dev_dbg(priv->drm_dev->dev, "set mode V slen %u, bporch %u, tot %u\n",
+			vsync_len, vback_porch, m->crtc_vtotal);
+
+		if (m->flags & DRM_MODE_FLAG_NHSYNC)
+			ctrl |= OCFB_CTRL_HSL;
+		else
+			ctrl &= ~OCFB_CTRL_HSL;
+
+		if (m->flags & DRM_MODE_FLAG_NVSYNC)
+			ctrl |= OCFB_CTRL_VSL;
+		else
+			ctrl &= ~OCFB_CTRL_VSL;
+
+		dev_dbg(priv->drm_dev->dev, "VPOL %d, HPOL %d\n",
+			m->flags & DRM_MODE_FLAG_NVSYNC,
+			m->flags & DRM_MODE_FLAG_NHSYNC);
+
+		/* Set sync polarity. */
+		ocdrm_writereg(priv, OCFB_CTRL, ctrl);
+
+		if (priv->clk_enabled)
+			clk_disable_unprepare(priv->pixel_clock);
+
+		clock = clk_round_rate(priv->pixel_clock,
+				m->clock * 1000);
+
+		dev_dbg(priv->drm_dev->dev, "pixel clock: %u, rounded to %lu\n",
+			m->clock, clock);
+
+		ret = clk_set_rate(priv->pixel_clock, clock);
+		if (ret) {
+			dev_err(priv->drm_dev->dev, "failed to set pixclk %d\n", ret);
+			return;
+		}
+
+		if (priv->clk_enabled) {
+			clk_prepare_enable(priv->pixel_clock);
+		}
+
+		/* if video was enabled, then re-enable it */
+		ocdrm_writereg(priv, OCFB_CTRL, ctrl);
 	}
-#endif
-	if (!plane_state->crtc || !plane_state->fb)
-		return;
 
-	ocdrm_writereg(priv, OCFB_CTRL, ctrl & ~OCFB_CTRL_VEN);
-
-	m = &plane_state->crtc->state->adjusted_mode;
-	hsync_len = m->crtc_hsync_end - m->crtc_hsync_start;
-	vsync_len = m->crtc_vsync_end - m->crtc_vsync_start;
-	vback_porch = m->crtc_vtotal - m->crtc_vsync_end;
-	hback_porch = m->crtc_htotal - m->crtc_hsync_end;
-	hgate = m->crtc_hdisplay;
-	pixel_format = plane_state->fb->pixel_format;
-
-	obj = drm_fb_cma_get_gem_obj(plane_state->fb, 0);
-	ocdrm_writereg(priv, OCFB_VBARA, obj->paddr);
-
-	ctrl &= ~(OCFB_CTRL_CD8 | OCFB_CTRL_CD16 |
-		OCFB_CTRL_CD24 | OCFB_CTRL_CD32);
-	ctrl &= ~(OCFB_CTRL_VBL8 | OCFB_CTRL_VBL4 |
-		OCFB_CTRL_VBL2 | OCFB_CTRL_VBL1);
-
-	switch (pixel_format) {
-		/* TODO
-		 *case DRM_FORMAT_RGB332:
-		 *	hgate /= 4;
-		 *	val |= OCFB_CTRL_CD8;
-		 *	val |= OCFB_CTRL_PC;
-		 *	break;
-		 */
-
-	case DRM_FORMAT_RGB565:
-		dev_dbg(priv->drm_dev->dev, "16 bpp\n");
-		hgate /= 2;
-		ctrl |= OCFB_CTRL_CD16;
-		break;
-
-	case DRM_FORMAT_RGB888:
-		dev_dbg(priv->drm_dev->dev, "24 bpp\n");
-		hgate = hgate * 3 / 4;
-		ctrl |= OCFB_CTRL_CD24;
-		break;
-
-	case DRM_FORMAT_XRGB8888:
-		dev_dbg(priv->drm_dev->dev, "32 bpp\n");
-		ctrl |= OCFB_CTRL_CD32;
-		break;
-
-	default:
-		dev_err(priv->drm_dev->dev, "Invalid pixelformat specified\n");
-		return;
-	}
-
-	if ((0 == (obj->paddr & 0x1f)) && (0 == (hgate % 8))) {
-		dev_dbg(priv->drm_dev->dev, "dma burst 8 cycles\n");
-		ctrl |= OCFB_CTRL_VBL8;
-	} else if ((0 == (obj->paddr & 0xf)) && (0 == (hgate % 4))) {
-		dev_dbg(priv->drm_dev->dev, "dma burst 4 cycles\n");
-		ctrl |= OCFB_CTRL_VBL4;
-	} else if ((0 == (obj->paddr & 0x7)) && (0 == (hgate % 2))) {
-		dev_dbg(priv->drm_dev->dev, "dma burst 2 cycles\n");
-		ctrl |= OCFB_CTRL_VBL2;
-	} else {
-		dev_dbg(priv->drm_dev->dev, "dma burst 1 cycle\n");
-		ctrl |= OCFB_CTRL_VBL1;
-	}
-
-	/* Horizontal timings */
-	ocdrm_writereg(priv, OCFB_HTIM, (hsync_len - 1) << 24 |
-		      (hback_porch - 1) << 16 | (m->crtc_hdisplay - 1));
-
-	/* Vertical timings */
-	ocdrm_writereg(priv, OCFB_VTIM, (vsync_len - 1) << 24 |
-		      (vback_porch - 1) << 16 | (m->crtc_vdisplay - 1));
-
-	ocdrm_writereg(priv, OCFB_HVLEN, ((uint32_t)m->crtc_htotal - 1) << 16 |
-		(m->crtc_vtotal - 1));
-
-	dev_dbg(priv->drm_dev->dev, "set mode H slen %u, bporch %u, tot %u\n",
-		hsync_len, hback_porch, m->crtc_htotal);
-	dev_dbg(priv->drm_dev->dev, "set mode V slen %u, bporch %u, tot %u\n",
-		vsync_len, vback_porch, m->crtc_vtotal);
-
-	if (m->flags & DRM_MODE_FLAG_NHSYNC)
-		ctrl |= OCFB_CTRL_HSL;
-	else
-		ctrl &= ~OCFB_CTRL_HSL;
-
-	if (m->flags & DRM_MODE_FLAG_NVSYNC)
-		ctrl |= OCFB_CTRL_VSL;
-	else
-		ctrl &= ~OCFB_CTRL_VSL;
-
-	dev_dbg(priv->drm_dev->dev, "VPOL %d, HPOL %d\n",
-		m->flags & DRM_MODE_FLAG_NVSYNC,
-		m->flags & DRM_MODE_FLAG_NHSYNC);
-
-	/* Set sync polarity. */
-	ocdrm_writereg(priv, OCFB_CTRL, ctrl);
-
-	if (priv->clk_enabled)
-		clk_disable_unprepare(priv->pixel_clock);
-
-	clock = clk_round_rate(priv->pixel_clock,
-					m->clock * 1000);
-
-	dev_dbg(priv->drm_dev->dev, "pixel clock: %u, rounded to %lu\n",
-		m->clock, clock);
-
-	ret = clk_set_rate(priv->pixel_clock, clock);
-	if (ret) {
-		dev_err(priv->drm_dev->dev, "failed to set pixclk %d\n", ret);
-		return;
-	}
-
-	if (priv->clk_enabled) {
-		clk_prepare_enable(priv->pixel_clock);
-	}
-
-	/* if video was enabled, then re-enable it */
-	ocdrm_writereg(priv, OCFB_CTRL, ctrl);
+	ocdrm_send_vblank_event(&pipe->crtc);
 }
-
 
 static int ocdrm_check(struct drm_simple_display_pipe *pipe,
 		     struct drm_plane_state *plane_state,
