@@ -379,6 +379,7 @@ static int ocdrm_load(struct drm_device *dev)
 		return -ENODEV;
 
 	bridge = of_drm_find_bridge(bridge_node);
+	of_node_put(bridge_node);
 	if (!bridge)
 		return -EPROBE_DEFER;
 
