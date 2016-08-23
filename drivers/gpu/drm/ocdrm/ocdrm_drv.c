@@ -491,13 +491,8 @@ static int ocdrm_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_unload;
 
-	ret = drm_connector_register_all(drm);
-	if (ret)
-		goto err_unregister;
 	return 0;
 
-err_unregister:
-	drm_dev_unregister(drm);
 err_unload:
 	ocdrm_unload(drm);
 err_unref:
@@ -511,7 +506,6 @@ static int ocdrm_remove(struct platform_device *pdev)
 	struct ocdrm_priv *priv = platform_get_drvdata(pdev);
 	struct drm_device *drm = priv->drm_dev;
 
-	drm_connector_unregister_all(priv->drm_dev);
 	drm_dev_unregister(drm);
 	ocdrm_unload(drm);
 	drm_dev_unref(drm);
