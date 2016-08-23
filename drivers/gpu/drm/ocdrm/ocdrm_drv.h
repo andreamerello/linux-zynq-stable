@@ -78,6 +78,7 @@ struct ocdrm_priv {
 	struct drm_crtc crtc;
 	struct drm_plane plane;
 	struct drm_encoder encoder;
+	struct drm_bridge *bridge;
 	struct drm_simple_display_pipe pipe;
 	struct clk *pixel_clock;
 	bool clk_enabled;
