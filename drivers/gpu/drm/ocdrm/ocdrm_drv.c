@@ -383,7 +383,11 @@ static int ocdrm_load(struct drm_device *dev)
 	if (!bridge)
 		return -EPROBE_DEFER;
 
-	drm_simple_display_pipe_attach_bridge(&priv->pipe, bridge);
+	ret = drm_simple_display_pipe_attach_bridge(&priv->pipe, bridge);
+	if (ret) {
+		DRM_ERROR("failed to attach the bridge\n");
+		return ret;
+	}
 
 	drm_mode_config_reset(dev);
 	drm_kms_helper_poll_init(dev);
