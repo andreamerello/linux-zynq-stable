@@ -414,6 +414,8 @@ static int ocdrm_unload(struct drm_device *dev)
 {
 	struct ocdrm_priv *priv = dev->dev_private;
 
+	ocdrm_writereg(priv, OCFB_CTRL, 0);
+
 	if (priv->fbdev) {
 		drm_fbdev_cma_fini(priv->fbdev);
 		priv->fbdev = NULL;
