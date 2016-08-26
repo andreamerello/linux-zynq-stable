@@ -85,12 +85,19 @@
 		#address-cells = <0x1>;
 		#size-cells = <0x0>;
 		autorepeat;
-		K1 {
-			label = "K1";
+
+		button_power_at_0 {
+			label = "Power button birt";
+			/* EMI050, active low */
 			gpios = <&gpio0 0x32 0x1>;
-			linux,code = <0x66>;
+			linux,code = <0x74>;
 			gpio-key,wakeup;
 			autorepeat;
+			/* uncomment the following line to
+			 * make the button react only to a
+			 * protracted pressure
+			 */
+			/* debounce-interval = <3000>; */
 		};
 	};
 };
