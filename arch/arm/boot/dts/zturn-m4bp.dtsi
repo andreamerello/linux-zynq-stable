@@ -33,19 +33,20 @@
 		alert@0 {
 			reg = <0xc>;
 			compatible = "smbus_alert";
-			interrupts = <0 36 4>;
+			interrupts = <0 35 4>;
 		};
 
 		temp1@48 {
 			compatible = "stts751";
-			has-therm;
-			has-event;
 			reg = <0x48>;
+			has-event;
+			//has-therm;
 		};
 		temp2@39 {
 			compatible = "stts751";
 			reg = <0x39>;
-			has-therm;
+			has-event;
+			//has-therm;
 		};
 	};
 
