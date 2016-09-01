@@ -201,18 +201,32 @@ static int stts751_manual_conversion(struct stts751_priv *priv)
 	return -ETIMEDOUT;
 }
 
+/* Converts temperature in C split in integer and fractional parts, as supplied
+ * by the HW, to an integer number in mC
+ */
 static int stts751_to_deg(s32 integer, s32 frac)
 {
 	s32 temp;
 
-	frac = frac * 500 / 128;
+	/* frac part is supplied by the HW as a numbert whose bits weight, from
+	 * MSB to LSB, are 2-e1, 2e-2 .. 2e-8; while stored as a regular integer
+	 * it would be interpreted as usual (2e+128, 2e+64 ...), so we basically
+	 * need to divide it by 256 to ajust the bits' weight.
+	 * However this would squash it to zero, so let's convert in in mC (mul
+	 * by 1000) right before divide.
+	 */
+	frac = frac * 1000 / 256;
 	temp = sign_extend32(integer, 7) * 1000L + frac;
 
 	return temp;
 }
 
+/* Converts temperature in mC to value in C split in integer and fractional
+ * parts, as the HW wants.
+ */
 static int stts751_to_hw(int val, u8 *integer, u8 *frac)
 {
+	/* HW works in range -64C to +127C */
 	if ((val > 127000) || (val < -64000))
 		return -EINVAL;
 
