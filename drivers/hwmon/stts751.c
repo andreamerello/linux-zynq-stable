@@ -289,16 +289,6 @@ static int stts751_update_temp(struct stts751_priv *priv)
 		sample1 = jiffies;
 		integer1 = i2c_smbus_read_byte_data(priv->client, STTS751_REG_TEMP_H);
 
-#warning delme_Debug
-		if (integer1 == 0) {
-			int a, b;
-
-			a = i2c_smbus_read_byte_data(priv->client, STTS751_REG_CONF);
-			b = i2c_smbus_read_byte_data(priv->client, STTS751_REG_STATUS);
-			printk("%d %d!!!!\n", a, b);
-		}
-////////////////////
-
 		if (integer1 < 0) {
 			ret = integer1;
 			dev_warn(&priv->client->dev,
@@ -503,9 +493,7 @@ static ssize_t show_input(struct device *dev, struct device_attribute *attr,
 		priv->last_update = jiffies;
 		priv->data_valid = true;
 	}
-#warning delme_debug
-	if (priv->temp == 0)
-		printk("fdffffff\n");
+
 	//TODO check len
 	return snprintf(buf, PAGE_SIZE - 1, "%d\n", priv->temp);
 }
