@@ -150,7 +150,7 @@ static const struct stts751_intervals_t stts751_intervals[] = {
 #define STTS751_INTERVAL_MANUAL 0xFF
 
 struct stts751_priv {
-	struct device *hwmon_dev;
+	struct device *dev;
 	struct i2c_client *client;
 	struct mutex access_lock;
 	unsigned long interval;
@@ -412,18 +412,16 @@ static void stts751_alert(struct i2c_client *client, unsigned int data)
 		dev_notice(&client->dev, "got alert for HIGH temperature");
 
 		/* unblock alert poll */
-		sysfs_notify(&priv->hwmon_dev->kobj, NULL,
-			"temp1_event_max_alert");
-		kobject_uevent(&priv->hwmon_dev->kobj, KOBJ_CHANGE);
+		sysfs_notify(&priv->dev->kobj, NULL, "temp1_event_max_alert");
+		kobject_uevent(&priv->dev->kobj, KOBJ_CHANGE);
 	}
 
 	if (!prev_min && priv->min_alert) {
 		dev_notice(&client->dev, "got alert for LOW temperature");
 
 		/* unblock alert poll */
-		sysfs_notify(&priv->hwmon_dev->kobj, NULL,
-			"temp1_event_min_alert");
-		kobject_uevent(&priv->hwmon_dev->kobj, KOBJ_CHANGE);
+		sysfs_notify(&priv->dev->kobj, NULL, "temp1_event_min_alert");
+		kobject_uevent(&priv->dev->kobj, KOBJ_CHANGE);
 	}
 	mutex_unlock(&priv->access_lock);
 }
@@ -946,10 +944,10 @@ static int stts751_probe(struct i2c_client *client,
 	if (ret)
 		return ret;
 
-	priv->hwmon_dev = devm_hwmon_device_register_with_groups(&client->dev,
+	priv->dev = devm_hwmon_device_register_with_groups(&client->dev,
 							client->name, priv,
 							priv->groups);
-	return PTR_ERR_OR_ZERO(priv->hwmon_dev);
+	return PTR_ERR_OR_ZERO(priv->dev);
 }
 
 static const struct i2c_device_id stts751_id[] = {
