@@ -348,7 +348,7 @@ exit:
 	if (ret)
 		return ret;
 
-	/* use interger2, because when we fallback to the "MSB-only" compromise
+	/* use integer2, because when we fallback to the "MSB-only" compromise
 	 * this is the more recent one
 	 */
 	priv->temp = stts751_to_deg(integer2, frac);
@@ -875,7 +875,7 @@ static int stts751_probe(struct i2c_client *client,
 
 	/* default to 2 samples per second */
 	priv->interval = 5;
-	/* default to timeout enbale, as per chip default */
+	/* default to timeout enable, as per chip default */
 	priv->smbus_timeout = true;
 	priv->last_update = 0;
 	priv->data_valid = false;
