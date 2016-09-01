@@ -484,15 +484,18 @@ static ssize_t show_input(struct device *dev, struct device_attribute *attr,
 			  char *buf)
 {
 	int ret;
-	int cache_time;
+	int cache_time = STTS751_CACHE_TIME * HZ / 1000;
 	struct stts751_priv *priv = dev_get_drvdata(dev);
 
+	/* If we are in auto conversion mode adjust the cache time wrt the
+	 * sample rate. We do 4X in order to get a new measure in no more than
+	 * 1/4 of the sample time (that seemed reasonable to me).
+	 */
 	if (priv->interval != STTS751_INTERVAL_MANUAL)
-		cache_time = stts751_intervals[priv->interval].val / 4;
-	else
-		cache_time = STTS751_CACHE_TIME;
+		cache_time = stts751_intervals[priv->interval].val /
+			4 * HZ / 1000;
 
-	if (time_after(jiffies,	priv->last_update + cache_time * HZ / 1000) ||
+	if (time_after(jiffies,	priv->last_update + cache_time) ||
 		!priv->data_valid) {
 		ret = stts751_update_temp(priv);
 		if (ret)
