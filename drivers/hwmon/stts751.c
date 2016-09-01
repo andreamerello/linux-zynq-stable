@@ -433,7 +433,6 @@ static ssize_t show_max_alert(struct device *dev, struct device_attribute *attr,
 {
 	struct stts751_priv *priv = dev_get_drvdata(dev);
 
-	//TODO check len
 	return snprintf(buf, PAGE_SIZE - 1, "%d\n", priv->max_alert);
 }
 
@@ -454,7 +453,6 @@ static ssize_t show_min_alert(struct device *dev, struct device_attribute *attr,
 {
 	struct stts751_priv *priv = dev_get_drvdata(dev);
 
-	//TODO check len
 	return snprintf(buf, PAGE_SIZE - 1, "%d\n", priv->min_alert);
 }
 
@@ -494,7 +492,6 @@ static ssize_t show_input(struct device *dev, struct device_attribute *attr,
 		priv->data_valid = true;
 	}
 
-	//TODO check len
 	return snprintf(buf, PAGE_SIZE - 1, "%d\n", priv->temp);
 }
 
