@@ -865,53 +865,20 @@ static int stts751_probe(struct i2c_client *client,
 	priv->data_valid = false;
 	priv->max_alert = false;
 	priv->min_alert = false;
+	priv->gen_therm = false;
+	priv->gen_event = false;
+	priv->therm = STTS751_THERM_DEFAULT;
+	priv->hyst = STTS751_HYST_DEFAULT;
+	priv->event_max = STTS751_EVENT_MAX_DEFAULT;
+	priv->event_min = STTS751_EVENT_MIN_DEFAULT;
 
         if (of_node) {
 		priv->gen_therm = of_property_read_bool(of_node, "has-therm");
-		if (priv->gen_therm) {
-			ret = of_property_read_s32(of_node, "therm-val",
-						&priv->therm);
-			if (ret) {
-				dev_warn(&client->dev,
-					"thermal HW pin active, but therm-val not set");
-				priv->therm = STTS751_THERM_DEFAULT;
-			}
-
-			ret = of_property_read_s32(of_node, "therm-hyst",
-						&priv->hyst);
-			if (ret) {
-				dev_warn(&client->dev,
-					"thermal HW pin active, but therm-hyst not set");
-				priv->hyst = STTS751_HYST_DEFAULT;
-			}
-		}
-
 		priv->gen_event = of_property_read_bool(of_node, "has-event");
-		if (priv->gen_event) {
-			ret = of_property_read_s32(of_node, "event-max",
-						&priv->event_max);
-			if (ret) {
-				dev_warn(&client->dev,
-					"event HW pin active, but event-max not set");
-				priv->event_max = STTS751_EVENT_MAX_DEFAULT;
-			}
-
-			ret = of_property_read_s32(of_node, "event-min",
-						&priv->event_min);
-			if (ret) {
-				dev_warn(&client->dev,
-					"event HW pin active, but event-min not set");
-				priv->event_min = STTS751_EVENT_MIN_DEFAULT;
-			}
-		}
-
 		priv->smbus_timeout =
 			!of_property_read_bool(of_node, "smbus-timeout-disable");
 	} else {
 		dev_notice(&client->dev, "No DT data. Event/therm disabled\n");
-		priv->gen_therm = false;
-		priv->gen_event = false;
-		priv->interval = STTS751_INTERVAL_MANUAL;
 	}
 
 	dev_dbg(&client->dev, "gen_event: %s, gen_therm: %s",
