@@ -848,9 +848,7 @@ static int stts751_probe(struct i2c_client *client,
 	int ret;
 	int groups_idx = 0;
 	struct device_node *of_node = client->dev.of_node;
-// TODO
-//	struct stts751_platform_data *pdata = dev_get_platdata(&client->dev);
-//
+
 	priv = devm_kzalloc(&client->dev, sizeof(struct stts751_priv), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
@@ -909,13 +907,8 @@ static int stts751_probe(struct i2c_client *client,
 
 		priv->smbus_timeout =
 			!of_property_read_bool(of_node, "smbus-timeout-disable");
-// TODO
-//	} else if (pdata) {
-//		FROM pdata: gen_event, gen_therm
-//		FROM pdata: optional irq for gen_event and gen_them
 	} else {
-		dev_notice(&client->dev, "Neither platform data or DT data provided\n"
-			"event/therm lines will be disabled");
+		dev_notice(&client->dev, "No DT data. Event/therm disabled\n");
 		priv->gen_therm = false;
 		priv->gen_event = false;
 		priv->interval = STTS751_INTERVAL_MANUAL;
