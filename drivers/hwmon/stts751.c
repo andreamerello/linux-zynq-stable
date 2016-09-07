@@ -90,8 +90,8 @@ static const unsigned short normal_i2c[] = {
 
 #define STTS751_REG_TEMP_H	0x00
 #define STTS751_REG_STATUS	0x01
+#define STTS751_STATUS_TRIPL	BIT(5)
 #define STTS751_STATUS_TRIPH	BIT(6)
-#define STTS751_STATUS_TRIPL	BIT(7)
 #define STTS751_STATUS_BUSY	BIT(8)
 #define STTS751_REG_TEMP_L	0x02
 #define STTS751_REG_CONF	0x03
