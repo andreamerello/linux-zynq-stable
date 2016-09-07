@@ -1,7 +1,7 @@
 * STTS751 thermometer.
 
 Required node properties:
-- compatible: "st,stts751"
+- compatible: "stts751"
 - reg: I2C bus address of the device
 
 Optional properties:
@@ -12,7 +12,7 @@ Optional properties:
 Example stts751 node:
 
 temp-sensor {
-	compatible = "st,stts751";
+	compatible = "stts751";
 	reg = <0x48>;
 	has-therm;
 	has-event;
