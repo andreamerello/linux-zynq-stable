@@ -547,7 +547,7 @@ static ssize_t set_hyst(struct device *dev, struct device_attribute *attr,
 
 	dev_dbg(dev, "setting hyst %ld", temp);
 
-	priv->therm = temp;
+	priv->hyst = temp;
 	return count;
 }
 
