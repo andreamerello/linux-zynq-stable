@@ -7,7 +7,7 @@ Required properties:
   See ../clocks/clock-bindings.txt for details.
 
 Required sub-nodes:
-- port: the connection to a DRM bridge.  The connection is modelled
+- port: the connection to a bridge chip.  The connection is modelled
   using the OF graph bindings specified in
   Documentation/devicetree/bindings/graph.txt.
 
