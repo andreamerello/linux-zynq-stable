@@ -85,6 +85,8 @@ struct ocdrm_priv {
 	void __iomem *regs;
 	bool little_endian;
 	u32 max_clock;
+	u16 max_height;
+	u16 max_width;
 };
 
 extern void ocdrm_writereg(struct ocdrm_priv *priv, loff_t offset, u32 data);

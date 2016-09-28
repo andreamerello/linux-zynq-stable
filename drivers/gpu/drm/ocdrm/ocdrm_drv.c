@@ -318,8 +318,8 @@ static void ocdrm_mode_config_init(struct ocdrm_priv *priv)
 	dev->mode_config.min_width = 0;
 	dev->mode_config.min_height = 0;
 
-	dev->mode_config.max_width = 1500;
-	dev->mode_config.max_height = 1500;
+	dev->mode_config.max_width = priv->max_width;
+	dev->mode_config.max_height = priv->max_height;
 
 	dev->mode_config.funcs = &ocdrm_mode_config_funcs;
 }
@@ -359,6 +359,20 @@ static int ocdrm_load(struct drm_device *dev)
 				"max-pixclk", &priv->max_clock);
 	if (ret < 0)
 		priv->max_clock = 0;
+
+	ret = of_property_read_u16(dev->dev->of_node,
+				"max-width", &priv->max_width);
+	if (ret < 0) {
+		DRM_ERROR("missing max-width property in DT\n");
+		return -EINVAL;
+	}
+
+	ret = of_property_read_u16(dev->dev->of_node,
+				"max-height", &priv->max_height);
+	if (ret < 0) {
+		DRM_ERROR("missing max-height property in DT\n");
+		return -EINVAL;
+	}
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	priv->regs = devm_ioremap_resource(&pdev->dev, res);
