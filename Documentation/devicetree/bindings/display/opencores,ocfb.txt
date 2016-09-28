@@ -17,11 +17,10 @@ ocdrm@43c10000 {
 	compatible = "opencores,ocfb";
 	reg = <0x43c10000 0x10000>;
 	clocks = <&pix_clock>;
-	ports {
-		port@0 {
-			rgb_out: endpoint {
-				remote-endpoint = <&bridge_in>;
-			};
+	port {
+		rgb_out: endpoint {
+			remote-endpoint = <&bridge_in>;
 		};
 	};
+
 };
