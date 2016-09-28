@@ -59,7 +59,7 @@
 
 #define DRIVER_NAME	"ocdrm"
 #define DRIVER_DESC	"OpenCores DRM"
-#define DRIVER_DATE	"20160629"
+#define DRIVER_DATE	"20160928"
 #define DRIVER_MAJOR	1
 #define DRIVER_MINOR	0
 
@@ -292,9 +292,10 @@ static int ocdrm_check(struct drm_simple_display_pipe *pipe,
 	uint32_t vsync_len = m->crtc_vsync_end - m->crtc_vsync_start;
 	uint32_t vback_porch = m->crtc_vtotal - m->crtc_vsync_end;
 	uint32_t hback_porch = m->crtc_htotal - m->crtc_hsync_end;
+	struct ocdrm_priv *priv = pipe_to_ocdrm(pipe);
 
-	if (m->clock < 16000 || m->clock > 165000)
-		return false;
+	if (priv->max_clock && m->clock > priv->max_clock)
+		return -EINVAL;
 
 	if (hsync_len > 255 || vsync_len > 255 ||
 		vback_porch > 255 || hback_porch > 255)
@@ -353,6 +354,11 @@ static int ocdrm_load(struct drm_device *dev)
 	priv->pixel_clock = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(priv->pixel_clock))
 		return -EPROBE_DEFER;
+
+	ret = of_property_read_u32(dev->dev->of_node,
+				"max-pixclk", &priv->max_clock);
+	if (ret < 0)
+		priv->max_clock = 0;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	priv->regs = devm_ioremap_resource(&pdev->dev, res);
