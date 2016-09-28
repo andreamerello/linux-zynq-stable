@@ -478,7 +478,7 @@ static struct drm_driver ocdrm_drm_driver = {
 };
 
 static const struct of_device_id ocdrm_of_match[] = {
-	{ .compatible = "opencores,ocfb-drm", },
+	{ .compatible = "opencores,ocfb", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, ocdrm_of_match);
