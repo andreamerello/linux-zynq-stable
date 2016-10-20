@@ -16,6 +16,11 @@ Required Properties:
   - interrupts: Interrupt specifier
   - interrupt-parent: Phandle for the interrupt controller that services
 		      interrupts for this device.
+Optional properties:
+  - xlnx,emio: when 1 means that the SDHCI is routed through EMIO and then 
+               disable the High Speed. When 0 the High Speed is enabled because 
+               of MIO are used.
+
 
 Example:
 	sdhci@e0100000 {
