@@ -21,6 +21,10 @@ Required Properties:
   - interrupts: Interrupt specifier
   - interrupt-parent: Phandle for the interrupt controller that services
 		      interrupts for this device.
+Optional properties:
+  - xlnx,emio: Quirk for Zynq controllers: when 1 means that the SDHCI pads are
+    routed through the FPGA to EMIO pins. In this case we disable disable
+    High Speed. When 0 the High Speed is enabled because MIO pins are used.
 
 Required Properties for "arasan,sdhci-5.1":
   - phys: From PHY bindings: Phandle for the Generic PHY for arasan.
