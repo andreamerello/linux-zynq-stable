@@ -13,3 +13,12 @@ config SND_SOC_IIT_SSM2518
 	select SND_SOC_SSM2518
 	help
       Audio support for various reference designs by Analog Devices.
+
+config SND_SOC_ZED_ADAU1761
+        tristate "ZED board sound support"
+        depends on SND_SOC_ADI
+        depends on I2C
+        select SND_SOC_ADI_AXI_I2S
+        select SND_SOC_ADAU1761_I2C
+	help
+      Audio support for ADAU1761 of ZedBoard
