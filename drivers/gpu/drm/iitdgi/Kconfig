@@ -1,0 +1,7 @@
+config DRM_IITDGI
+	tristate "DRM Support for IIT DGI video core"
+	depends on DRM
+	default	n
+	select DRM_KMS_HELPER
+	select DRM_KMS_CMA_HELPER
+	select VT_HW_CONSOLE_BINDING if FRAMEBUFFER_CONSOLE

@@ -232,6 +232,8 @@ source "drivers/gpu/drm/mediatek/Kconfig"
 
 source "drivers/gpu/drm/ocdrm/Kconfig"
 
+source "drivers/gpu/drm/iitdgi/Kconfig"
+
 # Keep legacy drivers last
 
 menuconfig DRM_LEGACY
