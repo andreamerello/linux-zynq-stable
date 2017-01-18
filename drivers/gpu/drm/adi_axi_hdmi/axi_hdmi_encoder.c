@@ -22,7 +22,7 @@
 
 #include "axi_hdmi_drv.h"
 
-#include "../i2c/adv7511.h"
+#include "../bridge/adv7511/adv7511.h"
 
 #define AXI_HDMI_LEGACY_REG_CTRL		0x04
 #define AXI_HDMI_LEGACY_REG_HTIMING1		0x08
