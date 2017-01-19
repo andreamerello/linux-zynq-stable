@@ -1,6 +1,6 @@
 /*
- * Open cores VGA/LCD 2.0 core DRM driver
- * Copyright (c) 2016 Istituto Italiano di Tecnologia
+ * IIT DGI video core DRM driver
+ * Copyright (c) 2017 Istituto Italiano di Tecnologia
  * Electronic Design Lab.
  *
  * Author: Andrea Merello <andrea.merello@gmail.com>
@@ -597,6 +597,6 @@ module_platform_driver(iitdgi_platform_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Andrea Merello <andrea.merello@gmail.com>");
-MODULE_DESCRIPTION("OpenCores DRM driver");
+MODULE_DESCRIPTION("IIT DGI DRM driver");
 module_param(test_mode, uint, 0);
 MODULE_PARM_DESC(test_mode, "inject test pattern for DMA test");

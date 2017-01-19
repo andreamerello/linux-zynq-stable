@@ -1,6 +1,6 @@
 /*
- * Open cores VGA/LCD 2.0 core DRM driver
- * Copyright (c) 2016 Istituto Italiano di Tecnologia
+ * IIT DGI video core DRM driver
+ * Copyright (c) 2017 Istituto Italiano di Tecnologia
  * Electronic Design Lab.
  *
  * Author: Andrea Merello <andrea.merello@gmail.com>
