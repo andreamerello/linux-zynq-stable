@@ -1210,10 +1210,6 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
 
 	head_desc = list_first_entry(&chan->pending_list,
 				struct xilinx_dma_tx_descriptor, node);
-	tail_desc = list_last_entry(&chan->pending_list,
-				    struct xilinx_dma_tx_descriptor, node);
-	tail_segment = list_last_entry(&tail_desc->segments,
-				       struct xilinx_axidma_tx_segment, node);
 
 	if (chan->has_sg && !chan->xdev->mcdma) {
 		old_head = list_first_entry(&head_desc->segments,
@@ -1233,6 +1229,11 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
 
 		tail_segment->hw.next_desc = chan->seg_v->phys;
 		head_desc->async_tx.phys = new_head->phys;
+	} else {
+		tail_desc = list_last_entry(&chan->pending_list,
+				    struct xilinx_dma_tx_descriptor, node);
+		tail_segment = list_last_entry(&tail_desc->segments,
+				       struct xilinx_axidma_tx_segment, node);
 	}
 
 	reg = dma_ctrl_read(chan, XILINX_DMA_REG_DMACR);
