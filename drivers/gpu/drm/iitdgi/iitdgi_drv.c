@@ -63,7 +63,8 @@
 #define DRIVER_MAJOR	1
 #define DRIVER_MINOR	0
 
-static unsigned int test_mode;
+static unsigned int test_mode = 0;
+static unsigned int test_pattern = 0;
 
 static inline struct iitdgi_priv *pipe_to_iitdgi(struct drm_simple_display_pipe *pipe)
 {
@@ -453,6 +454,11 @@ static int iitdgi_load(struct drm_device *dev)
 			priv->test_vaddr[i] = i;
 	}
 
+	if (test_pattern) {
+		for (i = 0; i < priv->max_height * priv->max_width; i++)
+			priv->test_vaddr[i] = test_pattern;
+	}
+
 	if (IS_ERR(priv->fbdev)) {
 		DRM_ERROR("failed to initialize drm fbdev\n");
 		ret = PTR_ERR(priv->fbdev);
@@ -599,4 +605,6 @@ MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Andrea Merello <andrea.merello@gmail.com>");
 MODULE_DESCRIPTION("IIT DGI DRM driver");
 module_param(test_mode, uint, 0);
-MODULE_PARM_DESC(test_mode, "inject test pattern for DMA test");
+MODULE_PARM_DESC(test_mode, "enable injection of test pattern");
+module_param(test_pattern, uint, 0);
+MODULE_PARM_DESC(test_pattern, "spcify which test pattern to use for test. 0 for DMA test");
