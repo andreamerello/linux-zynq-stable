@@ -150,8 +150,6 @@ static void iitdgi_enable(struct drm_simple_display_pipe *pipe,
 	ctrl = iitdgi_readreg(priv, DGI_CTRL);
 	iitdgi_writereg(priv, DGI_CTRL, ctrl | DGI_CTRL_VEN | DGI_CTRL_SYNC);
 	iitdgi_dma_enable(priv);
-
-		ctrl = iitdgi_readreg(priv, DGI_CTRL);
 }
 
 static void iitdgi_disable(struct drm_simple_display_pipe *pipe)
@@ -288,8 +286,6 @@ static void iitdgi_update(struct drm_simple_display_pipe *pipe,
 		if (dma_enable)
 			iitdgi_dma_enable(priv);
 		iitdgi_writereg(priv, DGI_CTRL, ctrl);
-
-		ctrl = iitdgi_readreg(priv, DGI_CTRL);
 	}
 
 	iitdgi_send_vblank_event(&pipe->crtc);
