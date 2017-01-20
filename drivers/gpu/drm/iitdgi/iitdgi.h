@@ -62,6 +62,7 @@
 #define DGI_CTRL_CD16	0x00000000 /* Color Depth 16 */
 #define DGI_CTRL_CD24	0x00010000 /* Color Depth 16 */
 #define DGI_CTRL_CD32	0x00020000 /* Color Depth 32 */
+#define DGI_CTRL_SYNC	0x80000000 /* Sync frame wrt AXI TLAST */
 
 struct iitdgi_priv {
 	struct drm_device *drm_dev;

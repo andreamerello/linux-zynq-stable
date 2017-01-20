@@ -148,8 +148,10 @@ static void iitdgi_enable(struct drm_simple_display_pipe *pipe,
 	priv->clk_enabled = true;
 
 	ctrl = iitdgi_readreg(priv, DGI_CTRL);
-	iitdgi_writereg(priv, DGI_CTRL, ctrl | DGI_CTRL_VEN);
+	iitdgi_writereg(priv, DGI_CTRL, ctrl | DGI_CTRL_VEN | DGI_CTRL_SYNC);
 	iitdgi_dma_enable(priv);
+
+		ctrl = iitdgi_readreg(priv, DGI_CTRL);
 }
 
 static void iitdgi_disable(struct drm_simple_display_pipe *pipe)
@@ -176,8 +178,8 @@ static void iitdgi_update(struct drm_simple_display_pipe *pipe,
 	uint32_t pixel_format;
 	uint32_t hsync_len;
 	uint32_t vsync_len;
-	uint32_t vback_porch;
-	uint32_t hback_porch;
+	uint32_t vback_porch, vfront_porch;
+	uint32_t hback_porch, hfront_porch;
 	unsigned long clock;
 	struct drm_display_mode *m;
 	bool dma_enable;
@@ -197,6 +199,8 @@ static void iitdgi_update(struct drm_simple_display_pipe *pipe,
 		vsync_len = m->crtc_vsync_end - m->crtc_vsync_start;
 		vback_porch = m->crtc_vtotal - m->crtc_vsync_end;
 		hback_porch = m->crtc_htotal - m->crtc_hsync_end;
+		hfront_porch = m->crtc_hsync_start - m->crtc_hdisplay;
+		vfront_porch = m->crtc_vsync_start - m->crtc_vdisplay;
 		pixel_format = plane_state->fb->pixel_format;
 
 		obj = drm_fb_cma_get_gem_obj(plane_state->fb, 0);
@@ -232,15 +236,15 @@ static void iitdgi_update(struct drm_simple_display_pipe *pipe,
 		}
 
 		/* Horizontal timings */
-		iitdgi_writereg(priv, DGI_HTIM, (hsync_len - 1) << 24 |
-			(hback_porch - 1) << 16 | (m->crtc_hdisplay - 1));
+		iitdgi_writereg(priv, DGI_HTIM, (hsync_len - 1) << 23 |
+			(hback_porch - 1) << 11 | (hfront_porch - 1));
 
 		/* Vertical timings */
-		iitdgi_writereg(priv, DGI_VTIM, (vsync_len - 1) << 24 |
-			(vback_porch - 1) << 16 | (m->crtc_vdisplay - 1));
+		iitdgi_writereg(priv, DGI_VTIM, (vsync_len - 1) << 23 |
+			(vback_porch - 1) << 11 | (vfront_porch - 1));
 
-		iitdgi_writereg(priv, DGI_HVLEN, ((uint32_t)m->crtc_htotal - 1) << 16 |
-			(m->crtc_vtotal - 1));
+		iitdgi_writereg(priv, DGI_HVLEN, ((uint32_t)m->crtc_vdisplay - 1) << 16 |
+			(m->crtc_hdisplay - 1));
 
 		dev_dbg(priv->drm_dev->dev, "set mode H slen %u, bporch %u, tot %u\n",
 			hsync_len, hback_porch, m->crtc_htotal);
@@ -260,9 +264,6 @@ static void iitdgi_update(struct drm_simple_display_pipe *pipe,
 		dev_dbg(priv->drm_dev->dev, "VPOL %d, HPOL %d\n",
 			m->flags & DRM_MODE_FLAG_NVSYNC,
 			m->flags & DRM_MODE_FLAG_NHSYNC);
-
-		/* Set sync polarity. */
-		iitdgi_writereg(priv, DGI_CTRL, ctrl);
 
 		if (priv->clk_enabled)
 			clk_disable_unprepare(priv->pixel_clock);
@@ -287,6 +288,8 @@ static void iitdgi_update(struct drm_simple_display_pipe *pipe,
 		if (dma_enable)
 			iitdgi_dma_enable(priv);
 		iitdgi_writereg(priv, DGI_CTRL, ctrl);
+
+		ctrl = iitdgi_readreg(priv, DGI_CTRL);
 	}
 
 	iitdgi_send_vblank_event(&pipe->crtc);
@@ -301,14 +304,18 @@ static int iitdgi_check(struct drm_simple_display_pipe *pipe,
 	uint32_t vsync_len = m->crtc_vsync_end - m->crtc_vsync_start;
 	uint32_t vback_porch = m->crtc_vtotal - m->crtc_vsync_end;
 	uint32_t hback_porch = m->crtc_htotal - m->crtc_hsync_end;
+	uint32_t hfront_porch = m->crtc_hsync_start - m->crtc_hdisplay;
+	uint32_t vfront_porch = m->crtc_vsync_start - m->crtc_vdisplay;
+
 	struct iitdgi_priv *priv = pipe_to_iitdgi(pipe);
 	dev_dbg(priv->drm_dev->dev, "Check..");
 
 	if ((priv->max_clock && (m->clock > priv->max_clock)) || (m->clock < 1))
 		return -EINVAL;
 
-	if (hsync_len > 255 || vsync_len > 255 ||
-		vback_porch > 255 || hback_porch > 255)
+	if (hsync_len > 512 || vsync_len > 512 ||
+		vback_porch > 512 || hback_porch > 512 ||
+		vfront_porch > 512 || hfront_porch > 512)
 		return -EINVAL;
 	dev_dbg(priv->drm_dev->dev, "Check OK..");
 	return 0;
