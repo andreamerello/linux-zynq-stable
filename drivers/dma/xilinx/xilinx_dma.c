@@ -409,6 +409,7 @@ struct xilinx_dma_device {
 	struct clk *rxs_clk;
 	u32 nr_channels;
 	u32 chan_id;
+	int max_transfer;
 };
 
 /* Macros */
@@ -1764,8 +1765,8 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
 			 * the next chuck start address is aligned
 			 */
 			copy = sg_dma_len(sg) - sg_used;
-			if (copy > XILINX_DMA_MAX_TRANS_LEN)
-				copy = XILINX_DMA_MAX_TRANS_LEN &
+			if (copy > chan->xdev->max_transfer)
+				copy = chan->xdev->max_transfer &
 					chan->copy_mask;
 
 			hw = &segment->hw;
@@ -1875,8 +1876,8 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_dma_cyclic(
 			 * the next chuck start address is aligned
 			 */
 			copy = period_len - sg_used;
-			if (copy > XILINX_DMA_MAX_TRANS_LEN)
-				copy = XILINX_DMA_MAX_TRANS_LEN &
+			if (copy > chan->xdev->max_transfer)
+				copy = chan->xdev->max_transfer &
 					chan->copy_mask;
 
 			hw = &segment->hw;
@@ -2539,7 +2540,7 @@ static int xilinx_dma_probe(struct platform_device *pdev)
 	struct xilinx_dma_device *xdev;
 	struct device_node *child, *np = pdev->dev.of_node;
 	struct resource *io;
-	u32 num_frames, addr_width;
+	u32 num_frames, addr_width, lenreg_width;
 	int i, err;
 
 	/* Allocate and initialize the DMA engine structure */
@@ -2570,8 +2571,17 @@ static int xilinx_dma_probe(struct platform_device *pdev)
 		return PTR_ERR(xdev->regs);
 
 	/* Retrieve the DMA engine properties from the device tree */
-	if (xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA)
+	if (xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
 		xdev->mcdma = of_property_read_bool(node, "xlnx,mcdma");
+		err = of_property_read_u32(node, "xlnx,lengthregwidth",
+					&lenreg_width);
+		if (err < 0) {
+			dev_err(xdev->dev,
+				"missing xlnx,lengthregwidth property\n");
+			return err;
+		}
+		xdev->max_transfer = GENMASK(lenreg_width, 0);
+	}
 
 	if (xdev->dma_config->dmatype == XDMA_TYPE_VDMA) {
 		err = of_property_read_u32(node, "xlnx,num-fstores",
