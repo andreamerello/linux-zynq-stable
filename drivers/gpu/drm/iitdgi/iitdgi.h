@@ -55,7 +55,7 @@
 #define DGI_VTIM	0x018
 #define DGI_HVLEN	0x01C
 
-#define DGI_ID_MAGIC	0x44474910
+#define DGI_ID_MAGIC	0x44474911
 #define DGI_CTRL_VEN	0x00000001 /* Video enable */
 #define DGI_CTRL_HSL	0x00004000 /* HSync active low */
 #define DGI_CTRL_VSL	0x00008000 /* VSync active low */
