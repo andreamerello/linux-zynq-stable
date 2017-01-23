@@ -404,17 +404,22 @@ static int iitdgi_load(struct drm_device *dev)
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	priv->regs = devm_ioremap_resource(&pdev->dev, res);
-	if (IS_ERR(priv->regs))
-		return PTR_ERR(priv->regs);
+	if (IS_ERR(priv->regs)) {
+		ret = PTR_ERR(priv->regs);
+		goto err_dma;
+	}
 
-	if (dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32)))
-		return -ENOMEM;
+	if (dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32))) {
+		ret = -ENOMEM;
+		goto err_dma;
+	}
 
 	id = iitdgi_readreg(priv, DGI_ID);
 	if (id != DGI_ID_MAGIC) {
 		dev_err(&pdev->dev, "DGI error. Magic is %x, expected %x",
 			id, DGI_ID_MAGIC);
-		return -ENODEV;
+		ret = -ENODEV;
+		goto err_dma;
 	}
 	dev_dbg(&pdev->dev, "DGI found!");
 
@@ -426,22 +431,28 @@ static int iitdgi_load(struct drm_device *dev)
 				NULL);
 
 	ep = of_graph_get_next_endpoint(priv->drm_dev->dev->of_node, NULL);
-	if (!ep)
-		return -ENODEV;
+	if (!ep) {
+		ret = -ENODEV;
+		goto err_dma;
+	}
 
 	bridge_node = of_graph_get_remote_port_parent(ep);
-	if (!bridge_node)
-		return -ENODEV;
+	if (!bridge_node) {
+		ret = -ENODEV;
+		goto err_dma;
+	}
 
 	bridge = of_drm_find_bridge(bridge_node);
 	of_node_put(bridge_node);
-	if (!bridge)
-		return -EPROBE_DEFER;
+	if (!bridge) {
+		ret = -EPROBE_DEFER;
+		goto err_dma;
+	}
 
 	ret = drm_simple_display_pipe_attach_bridge(&priv->pipe, bridge);
 	if (ret) {
 		DRM_ERROR("failed to attach the bridge\n");
-		return ret;
+		goto err_dma;
 	}
 	priv->bridge = bridge;
 
@@ -476,6 +487,9 @@ static int iitdgi_load(struct drm_device *dev)
 
 err_crtc:
 	drm_mode_config_cleanup(dev);
+err_dma:
+	dma_release_channel(priv->dma_chan);
+
 	return ret;
 }
 
