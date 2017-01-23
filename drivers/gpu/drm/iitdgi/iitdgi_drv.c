@@ -235,14 +235,15 @@ static void iitdgi_update(struct drm_simple_display_pipe *pipe,
 
 		/* Horizontal timings */
 		iitdgi_writereg(priv, DGI_HTIM, (hsync_len - 1) << 23 |
-			(hback_porch - 1) << 11 | (hfront_porch - 1));
+				(hback_porch - 1) << 11 | (hfront_porch - 1));
 
 		/* Vertical timings */
 		iitdgi_writereg(priv, DGI_VTIM, (vsync_len - 1) << 23 |
-			(vback_porch - 1) << 11 | (vfront_porch - 1));
+				(vback_porch - 1) << 11 | (vfront_porch - 1));
 
-		iitdgi_writereg(priv, DGI_HVLEN, ((uint32_t)m->crtc_vdisplay - 1) << 16 |
-			(m->crtc_hdisplay - 1));
+		iitdgi_writereg(priv, DGI_HVLEN,
+				((uint32_t)m->crtc_vdisplay - 1) << 16 |
+				(m->crtc_hdisplay - 1));
 
 		dev_dbg(priv->drm_dev->dev, "set mode H slen %u, bporch %u, tot %u\n",
 			hsync_len, hback_porch, m->crtc_htotal);
@@ -274,7 +275,8 @@ static void iitdgi_update(struct drm_simple_display_pipe *pipe,
 
 		ret = clk_set_rate(priv->pixel_clock, clock);
 		if (ret) {
-			dev_err(priv->drm_dev->dev, "failed to set pixclk %d\n", ret);
+			dev_err(priv->drm_dev->dev,
+				"failed to set pixclk %d\n", ret);
 			return;
 		}
 
@@ -420,7 +422,8 @@ static int iitdgi_load(struct drm_device *dev)
 	iitdgi_mode_config_init(priv);
 
 	drm_simple_display_pipe_init(dev, &priv->pipe, &iitdgi_pipe_funcs,
-				iitdgi_formats, ARRAY_SIZE(iitdgi_formats), NULL);
+				iitdgi_formats, ARRAY_SIZE(iitdgi_formats),
+				NULL);
 
 	ep = of_graph_get_next_endpoint(priv->drm_dev->dev->of_node, NULL);
 	if (!ep)
