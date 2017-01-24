@@ -459,14 +459,15 @@ static int iitdgi_load(struct drm_device *dev)
 	drm_mode_config_reset(dev);
 	drm_kms_helper_poll_init(dev);
 
-
-	priv->fbdev = drm_fbdev_cma_init(dev, 16, dev->mode_config.num_crtc,
-						dev->mode_config.num_connector);
 	if (test_mode) {
 		priv->test_vaddr = (u32*)dma_alloc_coherent(dev->dev,
 					priv->max_height * priv->max_width * 4,
 					&priv->dma_addr, GFP_KERNEL);
-
+		if (!priv->test_vaddr) {
+			DRM_ERROR("can't alloc DMA memory\n");
+			ret = -ENOMEM;
+			goto err_dma;
+		}
 		for (i = 0; i < priv->max_height * priv->max_width; i++)
 			priv->test_vaddr[i] = i;
 	}
@@ -476,17 +477,23 @@ static int iitdgi_load(struct drm_device *dev)
 			priv->test_vaddr[i] = test_pattern;
 	}
 
+	priv->fbdev = drm_fbdev_cma_init(dev, 16, dev->mode_config.num_crtc,
+						dev->mode_config.num_connector);
 	if (IS_ERR(priv->fbdev)) {
 		DRM_ERROR("failed to initialize drm fbdev\n");
 		ret = PTR_ERR(priv->fbdev);
-		goto err_crtc;
+		goto err_test;
 	}
 
 	platform_set_drvdata(pdev, priv);
 	return 0;
-
-err_crtc:
+err_test:
 	drm_mode_config_cleanup(dev);
+
+	if (test_mode)
+		dma_free_coherent(dev->dev,
+				priv->max_height * priv->max_width * 4,
+				priv->test_vaddr, priv->dma_addr);
 err_dma:
 	dma_release_channel(priv->dma_chan);
 
