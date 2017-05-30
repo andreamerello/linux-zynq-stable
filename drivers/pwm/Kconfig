@@ -175,6 +175,14 @@ config PWM_FSL_FTM
 	  To compile this driver as a module, choose M here: the module
 	  will be called pwm-fsl-ftm.
 
+config PWM_IIT
+	tristate "IIT EDL PWM support"
+	help
+	  Generic PWM framework driver for IIT EDL PWM IP
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called pwm-iit.
+
 config PWM_IMG
 	tristate "Imagination Technologies PWM driver"
 	depends on HAS_IOMEM
