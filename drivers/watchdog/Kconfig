@@ -714,6 +714,12 @@ config ASPEED_WATCHDOG
 	  To compile this driver as a module, choose M here: the
 	  module will be called aspeed_wdt.
 
+config IIT_WATCHDOG
+	tristate "IIT PWMWDT Watchdog"
+	select WATCHDOG_CORE
+	help
+	  This driver adds watchdog support for the watchdog in the IIT PWMWDT IP.
+
 # AVR32 Architecture
 
 config AT32AP700X_WDT
