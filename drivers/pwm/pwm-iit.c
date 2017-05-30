@@ -34,6 +34,7 @@
 #define PWMIIT_CH_REG_DC 	0x4
 #define PWMIIT_CH_REG_LEN 	0x8
 #define PWMIIT_EN_REG		0x4
+#define PWMIIT_EN_REG_WDT	0x10000
 
 struct pwmiit_priv {
 	struct pwm_chip chip;
@@ -61,7 +62,8 @@ static int iit_edlpwm_ch_read(struct pwmiit_priv *priv, int ch,
 static int iit_edlpwm_ch_enable(struct pwmiit_priv *priv, int ch, bool enable)
 {
 	int ret;
-	u32 mask = 1 << ch;
+	/* to avoid kicking the WDT we keep bit PWMIIT_EN_REG_WDT set to zero */
+	u32 mask = (1 << ch) | PWMIIT_EN_REG_WDT;
 	u32 val = (enable ? 1 : 0) << ch;
 
 	dev_dbg(priv->chip.dev, "PWM ch %d, enable: %d\n", ch, enable);
