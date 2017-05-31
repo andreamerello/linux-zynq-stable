@@ -163,6 +163,7 @@
 #define XILINX_DMA_CR_COALESCE_SHIFT	16
 #define XILINX_DMA_BD_SOP		BIT(27)
 #define XILINX_DMA_BD_EOP		BIT(26)
+#define XILINX_DMA_BD_CMPLT		BIT(31)
 #define XILINX_DMA_COALESCE_MAX		255
 #define XILINX_DMA_NUM_APP_WORDS	5
 
@@ -1238,12 +1239,9 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
 
 	reg = dma_ctrl_read(chan, XILINX_DMA_REG_DMACR);
 
-	if (chan->desc_pendingcount <= XILINX_DMA_COALESCE_MAX) {
-		reg &= ~XILINX_DMA_CR_COALESCE_MAX;
-		reg |= chan->desc_pendingcount <<
-				  XILINX_DMA_CR_COALESCE_SHIFT;
-		dma_ctrl_write(chan, XILINX_DMA_REG_DMACR, reg);
-	}
+	reg &= ~XILINX_DMA_CR_COALESCE_MAX;
+	reg |= 1 << XILINX_DMA_CR_COALESCE_SHIFT;
+	dma_ctrl_write(chan, XILINX_DMA_REG_DMACR, reg);
 
 	if (chan->has_sg && !chan->xdev->mcdma)
 		xilinx_write(chan, XILINX_DMA_REG_CURDESC,
@@ -1341,6 +1339,20 @@ static void xilinx_dma_complete_descriptor(struct xilinx_dma_chan *chan)
 		return;
 
 	list_for_each_entry_safe(desc, next, &chan->active_list, node) {
+		if (chan->xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
+			/*
+			 * Check whether the last segment in this descriptor
+			 * has been completed.
+			 */
+			const struct xilinx_axidma_tx_segment *const tail_segment =
+				list_last_entry(&desc->segments,
+						struct xilinx_axidma_tx_segment,
+						node);
+
+			/* we've processed all the completed descriptors */
+			if (!(tail_segment->hw.status & XILINX_DMA_BD_CMPLT))
+				break;
+		}
 		list_del(&desc->node);
 		if (!desc->cyclic)
 			dma_cookie_complete(&desc->async_tx);
@@ -1803,14 +1815,14 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
 	desc->async_tx.phys = segment->phys;
 	prev->hw.next_desc = segment->phys;
 
-	/* For the last DMA_MEM_TO_DEV transfer, set EOP */
-	if (chan->direction == DMA_MEM_TO_DEV) {
-		segment->hw.control |= XILINX_DMA_BD_SOP;
-		segment = list_last_entry(&desc->segments,
-					  struct xilinx_axidma_tx_segment,
-					  node);
-		segment->hw.control |= XILINX_DMA_BD_EOP;
-	}
+	/* For the first transfer, set SOP */
+	segment->hw.control |= XILINX_DMA_BD_SOP;
+	/* For the last transfer, set EOP */
+	segment = list_last_entry(&desc->segments,
+				  struct xilinx_axidma_tx_segment,
+				  node);
+	segment->hw.control |= XILINX_DMA_BD_EOP;
+
 
 	return &desc->async_tx;
 
