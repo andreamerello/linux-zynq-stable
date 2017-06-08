@@ -2032,14 +2032,30 @@ static int xilinx_dma_terminate_all(struct dma_chan *dchan)
 	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
 	u32 reg;
 
-	if (chan->cyclic)
+	/*
+	 * In case of dev2mem it's known that:
+	 * - If we stop the DMA before stopping the axistream source then
+	 *   we are likely to end up with few extra data items in DMA fifo,
+	 *   that the DMA will move to RAM next time we enable it. This
+	 *   basically causes garbage transfers when starting DMA 2nd time.
+	 * - If we stop the axistream source before the DMA, then the DMA
+	 *   termination seems to timeout, and in response we spit a a scaring
+	 *   warning message and we reset the DMA.
+	 *
+	 * For these reasons we just reset the DMA without further
+	 * complications..
+	 */
+	if (chan->cyclic || (chan->direction == DMA_DEV_TO_MEM)) {
+		/* Halt the DMA engine forcefully */
 		xilinx_dma_chan_reset(chan);
-
-	/* Halt the DMA engine */
-	xilinx_dma_halt(chan);
+	} else {
+		/* Halt the DMA engine gracefully */
+		xilinx_dma_halt(chan);
+	}
 
 	tasklet_kill(&chan->tasklet);
 
+	/* if we tried to gracefully halt the DMA but we failed.. */
 	if (chan->err)
 		xilinx_dma_chan_reset(chan);
 
