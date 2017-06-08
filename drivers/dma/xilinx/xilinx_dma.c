@@ -1202,13 +1202,6 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
 	if (list_empty(&chan->pending_list))
 		return;
 
-	/* If it is SG mode and hardware is busy, cannot submit */
-	if (chan->has_sg && xilinx_dma_is_running(chan) &&
-	    !xilinx_dma_is_idle(chan)) {
-		dev_dbg(chan->dev, "DMA controller still busy\n");
-		return;
-	}
-
 	head_desc = list_first_entry(&chan->pending_list,
 				struct xilinx_dma_tx_descriptor, node);
 
@@ -1243,6 +1236,12 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
 	reg |= 1 << XILINX_DMA_CR_COALESCE_SHIFT;
 	dma_ctrl_write(chan, XILINX_DMA_REG_DMACR, reg);
 
+	/*
+	 * DOC says that XILINX_DMA_REG_CURDESC reg becomes RO while the DMA
+	 * is enabled, so we write it unconditionally: if the DMA was stopped
+	 * then we successfully update the first descriptor address here,
+	 * otherwise the write is ignored
+	 */
 	if (chan->has_sg && !chan->xdev->mcdma)
 		xilinx_write(chan, XILINX_DMA_REG_CURDESC,
 			     head_desc->async_tx.phys);
@@ -1263,12 +1262,20 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
 		}
 	}
 
+	/* Enable DMA engine (in case it is not). Note that this must be done
+	 * after writing XILINX_DMA_REG_CURDESC, otherwise the said reg becomes
+	 * read-only
+	 */
 	xilinx_dma_start(chan);
 
 	if (chan->err)
 		return;
 
-	/* Start the transfer */
+	/*
+	 * Start the transfer by writing XILINX_DMA_REG_TAILDESC; if the DMA
+	 * was already running then this causes the DMA just to go further
+	 * up to the new tail
+	 */
 	if (chan->has_sg && !chan->xdev->mcdma) {
 		if (chan->cyclic)
 			xilinx_write(chan, XILINX_DMA_REG_TAILDESC,
