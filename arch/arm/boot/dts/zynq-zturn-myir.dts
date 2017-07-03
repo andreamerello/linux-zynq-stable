@@ -156,29 +156,115 @@
 	};
 };
 
+&i2c1 {
+	status = "okay";
+	clock-frequency = <400000>;
+
+	eeprom: eeprom@50 {
+		compatible = "atmel,24c64";
+		reg = <0x50>;
+		pagesize = <64>;
+	};  
+	
+	// IC84M - RTC device (MCP79410)
+	mcp7941x: mcp7941x@6f {
+		compatible = "mcp7941x";
+		reg = <0x6f>;
+	};
+};
+
 &amba {
-	auxdisp_0: auxdisp@43c00000 {
-		compatible = "iit,auxdisp-1.0";
+	auxdisp_0: auxdisp@43c20000 {
+		compatible = "iit,auxdisp-2.0";
 		interrupt-parent = <&intc>;
 		interrupts = <0 31 4>;
-		reg = <0x43c00000 0x10000>;
-		/* 109 = 54(offset default for gpio) + 55 */
-		auxdisp-reset = <&gpio0 109 1>;
+		reg = <0x43c20000 0x10000>;
+		/* 103 = 54(offset default for gpio) + 49 */
+        enable = <&gpio0 103 0>;
+		/* 103 = 54(offset default for gpio) + 48 */
+        vl = <&gpio0 102 0>;
 		dmas = <&axi_dma_0 0>;
-		dma-names = "mem2dev";
+		dma-names = "tx";
+	};
+	
+	audio_clock: audio_clock {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <12288000>;
 	};
 
 	axi_dma_0: dma@40400000 {
 		compatible = "xlnx,axi-dma-1.00.a";
+		clock-names = "s_axi_lite_aclk", "m_axi_sg_aclk", "m_axi_mm2s_aclk";
+		clocks = <&clkc 15>, <&clkc 15>, <&clkc 15>;
 		interrupt-parent = <&intc>;
 		interrupts = <0 29 4>;
 		#dma-cells = <1>;
 		reg = <0x40400000 0x10000>;
+		xlnx,addrwidth = <0x20>;
+		xlnx,lengthregwidth = < 13 >;
 		xlnx,include-sg ;
 		dma-channel@40400000 {
 			compatible = "xlnx,axi-dma-mm2s-channel";
+			dma-channels = <0x1>;
 			interrupts = <0 29 4>;
 			xlnx,datawidth = <0x20>;
+			xlnx,device-id = <0x0>;
+			};
+	};
+	axi_i2s_adi_0: axi_i2s_adi@43c30000 {
+		compatible = "adi,axi-i2s-1.00.a";
+		reg = <0x43c30000 0x10000>;
+		xlnx,bclk-pol = <0x0>;
+		xlnx,dma-type = <0x1>;
+		xlnx,has-rx = <0x1>;
+		xlnx,has-tx = <0x1>;
+		xlnx,lrclk-pol = <0x0>;
+		xlnx,num-ch = <0x1>;
+		xlnx,slot-width = <0x18>;
+		dmas = <&dmac_s 0 &dmac_s 1>;
+		dma-names = "tx", "rx";
+		clocks = <&clkc 15>, <&audio_clock>, <&audio_clock>;
+		clock-names = "axi", "ref", "i2s";
+	};
+	axi_iic_0: i2c@41600000 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		clock-frequency = <400000>;
+		clock-names = "ref_clk";
+		compatible = "xlnx,xps-iic-2.00.a";
+		interrupt-parent = <&intc>;
+		interrupts = <0 36 4>;
+		reg = <0x41600000 0x10000>;
+		clocks = <&clkc 15>;
+		ssm2518: ssm2518@36 {
+			compatible = "adi,ssm2518";
+			reg = <0x36>;
+			/*
+			 * nSD Active Low shutdown
+			 * 54+50 means GPIO50,
+			 */
+			gpios = <&gpio0 104 0>;
 		};
+	};
+	cer_sound {
+		compatible = "digilent,ssm2518-sound";
+		audio-codec = <&ssm2518>;
+		cpu-dai = <&axi_i2s_adi_0>;
+	};
+	gcpr_0: gcpr@43c10000 {
+		compatible = "xlnx,gcpr-1.0";
+		reg = <0x43c10000 0x10000>;
+		xlnx,num-regs = <0x2>;
+		xlnx,permission-regs = <0x1>;
+	};
+	rx_i2s_topm_1: rx_i2s_topm@43c00000 {
+		compatible = "iit,micif-1.0";
+		interrupt-parent = <&intc>;
+		interrupts = <0 33 4>;
+		reg = <0x43c00000 0x10000>;
+		enable_mic = <&gpio0 109 0>;
+		xlnx,debug = <0x1>;
+		xlnx,nummics = <9>;
 	};
 };
