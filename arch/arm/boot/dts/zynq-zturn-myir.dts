@@ -182,7 +182,7 @@
 		/* 103 = 54(offset default for gpio) + 49 */
         enable = <&gpio0 103 0>;
 		/* 103 = 54(offset default for gpio) + 48 */
-        vl = <&gpio0 102 0>;
+		vl = <&gpio0 102 0>;
 		dmas = <&axi_dma_0 0>;
 		dma-names = "tx";
 	};
