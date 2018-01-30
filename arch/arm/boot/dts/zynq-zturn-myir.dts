@@ -16,6 +16,7 @@
  */
 /dts-v1/;
 /include/ "zynq-7000.dtsi"
+/include/ "pl.dtsi"
 
 / {
 	model = "Zynq Z-Turn MYIR Board";
@@ -154,4 +155,21 @@
 		interrupt-parent = <&intc>;
 		interrupts = <0x0 0x1e 0x4>;
 	};
+
+    /* HDMI codec */
+    hdmi: sii9022a@3b {
+            status = "okay";
+            compatible = "sil,sii9022";
+            reg = <0x3b>;
+            interrupt-parent = <&intc>;
+            interrupts = <0 35 1>;
+            ports {
+                port@0 {
+                    bridge_in: endpoint {
+                        remote-endpoint = <&rgb_out>;
+                    };
+                };
+            };
+    };
+
 };
