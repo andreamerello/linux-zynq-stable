@@ -32,6 +32,7 @@
  */
 
 #include <linux/bitops.h>
+#include <linux/debugfs.h>
 #include <linux/dmapool.h>
 #include <linux/dma/xilinx_dma.h>
 #include <linux/init.h>
@@ -411,6 +412,9 @@ struct xilinx_dma_device {
 	u32 nr_channels;
 	u32 chan_id;
 	int max_transfer;
+#ifdef CONFIG_DEBUG_FS
+	struct dentry *debugfs;
+#endif
 };
 
 /* Macros */
@@ -2561,6 +2565,66 @@ static const struct of_device_id xilinx_dma_of_ids[] = {
 };
 MODULE_DEVICE_TABLE(of, xilinx_dma_of_ids);
 
+#ifdef CONFIG_DEBUG_FS
+
+static const struct debugfs_reg32 xilinx_dma_regset[] = {
+	{ .name = "MM2S_DMACR", .offset = 0x0 },
+	{ .name = "MM2S_DMASR", .offset = 0x4 },
+	{ .name = "MM2S_CURDESC", .offset = 0x8 },
+	{ .name = "MM2S_CURDESC_MSB", .offset = 0xc },
+	{ .name = "MM2S_TAILDESC", .offset = 0x10 },
+	{ .name = "MM2S_TAILDESC_MSB", .offset = 0x14 },
+	{ .name = "SG_CTL", .offset = 0x2c },
+	{ .name = "S2MM_DMACR", .offset = 0x30 },
+	{ .name = "S2MM_DMASR", .offset = 0x34 },
+	{ .name = "S2MM_CURDESC", .offset = 0x38 },
+	{ .name = "S2MM_CURDESC_MSB", .offset = 0x3c },
+	{ .name = "S2MM_TAILDESC", .offset = 0x40 },
+	{ .name = "S2MM_TAILDESC_MSB", .offset = 0x44 },
+};
+
+static int xilinx_dma_debugfs_init(struct xilinx_dma_device *xdev)
+{
+	struct debugfs_regset32 *regset;
+	struct dentry *f;
+
+	xdev->debugfs = debugfs_create_dir(dev_name(xdev->dev), NULL);
+	if (IS_ERR_OR_NULL(xdev->debugfs))
+		return -ENOMEM;
+
+	regset = devm_kzalloc(xdev->dev, sizeof(*regset), GFP_KERNEL);
+	if (!regset)
+		return -ENOMEM;
+
+	regset->regs = xilinx_dma_regset;
+	regset->nregs = ARRAY_SIZE(xilinx_dma_regset);
+	regset->base = xdev->regs;
+
+	f = debugfs_create_regset32("regdump", 0600, xdev->debugfs, regset);
+	if (!f || IS_ERR(f)) {
+		dev_dbg(xdev->dev, "Can't create debugfs regset\n");
+		goto exit;
+	}
+exit:
+	return 0;
+}
+
+static void xilinx_dma_debugfs_cleanup(struct xilinx_dma_device *xdev)
+{
+	debugfs_remove_recursive(xdev->debugfs);
+}
+
+#else
+static int xilinx_dma_debugfs_init(struct xilinx_dma_device *xdev)
+{
+	return 0;
+}
+
+static void xilinx_dma_debugfs_cleanup(struct xilinx_dma_device *xdev)
+{
+}
+#endif
+
 /**
  * xilinx_dma_probe - Driver probe function
  * @pdev: Pointer to the platform_device structure
@@ -2709,6 +2773,7 @@ static int xilinx_dma_probe(struct platform_device *pdev)
 
 	dev_info(&pdev->dev, "Xilinx AXI VDMA Engine Driver Probed!!\n");
 
+	xilinx_dma_debugfs_init(xdev);
 	return 0;
 
 disable_clks:
@@ -2731,6 +2796,8 @@ static int xilinx_dma_remove(struct platform_device *pdev)
 {
 	struct xilinx_dma_device *xdev = platform_get_drvdata(pdev);
 	int i;
+
+	xilinx_dma_debugfs_cleanup(xdev);
 
 	of_dma_controller_free(pdev->dev.of_node);
 
