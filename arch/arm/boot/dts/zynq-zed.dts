@@ -32,6 +32,7 @@
  /include/ "zed-ocfb-edl.dtsi"
  */
 
+ /include/ "zed-spinnaker.dtsi"
 
 / {
 	model = "Zynq Zed Development Board";
