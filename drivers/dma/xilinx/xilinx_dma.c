@@ -343,6 +343,7 @@ struct xilinx_dma_chan {
 	struct list_head pending_list;
 	struct list_head active_list;
 	struct list_head done_list;
+	struct xilinx_dma_tx_descriptor *dangling_desc;
 	struct dma_chan common;
 	struct dma_pool *desc_pool;
 	struct device *dev;
@@ -716,7 +717,9 @@ static void xilinx_dma_free_descriptors(struct xilinx_dma_chan *chan)
 	xilinx_dma_free_desc_list(chan, &chan->pending_list);
 	xilinx_dma_free_desc_list(chan, &chan->done_list);
 	xilinx_dma_free_desc_list(chan, &chan->active_list);
-
+	if (chan->dangling_desc)
+		xilinx_dma_free_tx_descriptor(chan, chan->dangling_desc);
+	chan->dangling_desc = NULL;
 	spin_unlock_irqrestore(&chan->lock, flags);
 }
 
@@ -781,6 +784,9 @@ static void xilinx_dma_chan_desc_cleanup(struct xilinx_dma_chan *chan)
 			break;
 		}
 
+		if (chan->dangling_desc)
+			xilinx_dma_free_tx_descriptor(chan, chan->dangling_desc);
+
 		/* Remove from the list of running transactions */
 		list_del(&desc->node);
 
@@ -794,7 +800,7 @@ static void xilinx_dma_chan_desc_cleanup(struct xilinx_dma_chan *chan)
 
 		/* Run any dependencies, then free the descriptor */
 		dma_run_dependencies(&desc->async_tx);
-		xilinx_dma_free_tx_descriptor(chan, desc);
+		chan->dangling_desc = desc;
 	}
 
 	spin_unlock_irqrestore(&chan->lock, flags);
