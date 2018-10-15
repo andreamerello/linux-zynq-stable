@@ -1226,7 +1226,7 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
 					struct xilinx_axidma_tx_segment, node);
 		new_head = chan->seg_v;
 		/* Copy Buffer Descriptor fields. */
-		new_head->hw = old_head->hw;
+		WRITE_ONCE(new_head->hw, old_head->hw);
 
 		/* Swap and save new reserve */
 		list_replace_init(&old_head->node, &new_head->node);
@@ -1373,7 +1373,7 @@ static void xilinx_dma_complete_descriptor(struct xilinx_dma_chan *chan)
 						node);
 
 			/* we've processed all the completed descriptors */
-			if (!(tail_segment->hw.status & XILINX_DMA_BD_CMPLT))
+			if (!(READ_ONCE(tail_segment->hw.status) & XILINX_DMA_BD_CMPLT))
 				break;
 		}
 		list_del(&desc->node);
