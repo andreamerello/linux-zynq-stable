@@ -437,6 +437,11 @@ static inline void dma_write(struct xilinx_dma_chan *chan, u32 reg, u32 value)
 	iowrite32(value, chan->xdev->regs + reg);
 }
 
+static inline void dma_write_relaxed(struct xilinx_dma_chan *chan, u32 reg, u32 value)
+{
+	writel_relaxed(value, chan->xdev->regs + reg);
+}
+
 static inline void vdma_desc_write(struct xilinx_dma_chan *chan, u32 reg,
 				   u32 value)
 {
@@ -452,6 +457,13 @@ static inline void dma_ctrl_write(struct xilinx_dma_chan *chan, u32 reg,
 				   u32 value)
 {
 	dma_write(chan, chan->ctrl_offset + reg, value);
+}
+
+static inline void dma_ctrl_write_coherent(struct xilinx_dma_chan *chan, u32 reg,
+				   u32 value)
+{
+	dma_write_relaxed(chan, chan->ctrl_offset + reg, value);
+	mb();
 }
 
 static inline void dma_ctrl_clr(struct xilinx_dma_chan *chan, u32 reg,
@@ -1440,7 +1452,11 @@ static irqreturn_t xilinx_dma_irq_handler(int irq, void *data)
 	if (!(status & XILINX_DMA_DMAXR_ALL_IRQ_MASK))
 		return IRQ_NONE;
 
-	dma_ctrl_write(chan, XILINX_DMA_REG_DMASR,
+	/*
+	 * Make sure clearing ISR has been committed _before_ checking
+	 * for DMA descriptors, otherwise we could miss one..
+	 */
+	dma_ctrl_write_coherent(chan, XILINX_DMA_REG_DMASR,
 			status & XILINX_DMA_DMAXR_ALL_IRQ_MASK);
 
 	if (status & XILINX_DMA_DMASR_ERR_IRQ) {
