@@ -766,6 +766,25 @@ static void xilinx_dma_chan_handle_cyclic(struct xilinx_dma_chan *chan,
 }
 
 /**
+ * xilinx_dma_dmc_calc_residue - get residue for a given descriptor
+ * @desc: Driver specific DMA descriptor
+ */
+static int xilinx_dma_calc_residue(struct xilinx_dma_tx_descriptor *desc)
+{
+	struct xilinx_axidma_tx_segment *segment;
+	struct xilinx_axidma_desc_hw *hw;
+	int residue = 0;
+
+	list_for_each_entry(segment, &desc->segments, node) {
+		hw = &segment->hw;
+		residue += (hw->control - hw->status) &
+			XILINX_DMA_MAX_TRANS_LEN;
+	}
+
+	return residue;
+}
+
+/**
  * xilinx_dma_chan_desc_cleanup - Clean channel descriptors
  * @chan: Driver specific DMA channel
  */
@@ -773,6 +792,11 @@ static void xilinx_dma_chan_desc_cleanup(struct xilinx_dma_chan *chan)
 {
 	struct xilinx_dma_tx_descriptor *desc, *next;
 	unsigned long flags;
+
+	struct dmaengine_result result = {
+		.result = DMA_TRANS_NOERROR,
+		.residue = 0
+	};
 
 	spin_lock_irqsave(&chan->lock, flags);
 
@@ -793,8 +817,10 @@ static void xilinx_dma_chan_desc_cleanup(struct xilinx_dma_chan *chan)
 		/* Run the link descriptor callback function */
 		dmaengine_desc_get_callback(&desc->async_tx, &cb);
 		if (dmaengine_desc_callback_valid(&cb)) {
+			if (chan->has_sg && cb.callback_result)
+				result.residue = xilinx_dma_calc_residue(desc);
 			spin_unlock_irqrestore(&chan->lock, flags);
-			dmaengine_desc_callback_invoke(&cb, NULL);
+			dmaengine_desc_callback_invoke(&cb, &result);
 			spin_lock_irqsave(&chan->lock, flags);
 		}
 
@@ -913,8 +939,6 @@ static enum dma_status xilinx_dma_tx_status(struct dma_chan *dchan,
 {
 	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
 	struct xilinx_dma_tx_descriptor *desc;
-	struct xilinx_axidma_tx_segment *segment;
-	struct xilinx_axidma_desc_hw *hw;
 	enum dma_status ret;
 	unsigned long flags;
 	u32 residue = 0;
@@ -928,13 +952,8 @@ static enum dma_status xilinx_dma_tx_status(struct dma_chan *dchan,
 
 		desc = list_last_entry(&chan->active_list,
 				       struct xilinx_dma_tx_descriptor, node);
-		if (chan->has_sg) {
-			list_for_each_entry(segment, &desc->segments, node) {
-				hw = &segment->hw;
-				residue += (hw->control - hw->status) &
-					   XILINX_DMA_MAX_TRANS_LEN;
-			}
-		}
+		if (chan->has_sg)
+			residue = xilinx_dma_calc_residue(desc);
 		spin_unlock_irqrestore(&chan->lock, flags);
 
 		chan->residue = residue;
