@@ -8,6 +8,8 @@
 		reg = <0x43c00000 0x10000>;
 		interrupt-parent = <&intc>;
 		interrupts = <0 31 4>;
+		clocks = <&clkc 15>;
+		clock-names = "s_axi_aclk";
 
 		dmas = <&axi_dma_0 0>,<&axi_dma_0 1>;
 		dma-names = "tx", "rx";
