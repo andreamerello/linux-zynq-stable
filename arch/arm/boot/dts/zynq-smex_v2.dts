@@ -185,7 +185,7 @@
 
 &axi_iic_eeprom_temp {
         eeprom: eeprom@50 {
-                compatible = "atmel,24c64";
+                compatible = "atmel,24c256";
                 reg = <0x50>;
                 pagesize = <64>;
         };
