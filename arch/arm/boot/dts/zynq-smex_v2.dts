@@ -1,0 +1,273 @@
+/dts-v1/;
+/include/ "zynq-7000.dtsi"
+/include/ "zynq-smex_v2-pl.dtsi"
+/ {
+	cpus {
+		cpu@0 {
+			operating-points = <666666 1000000 333333 1000000>;
+		};
+	};
+
+	chosen {
+		bootargs = "console=ttyPS0,115200 root=/dev/mmcblk0p2 rw earlyprintk rootfstype=ext4 rootwait devtmpfs.mount=1";
+	};
+
+	aliases {
+		ethernet0 = &gem0;
+		serial0 = &uart0;
+		serial1 = &uart1;
+		spi1 = &spi0;
+		spi2 = &spi1;
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x0 0x40000000>;
+	};
+
+	gpio-leds {
+        compatible = "gpio-leds";
+		can0_led {
+			label = "can0_led";
+			gpios = <&gpio0 105 0x0>;
+			default-state = "off";
+			linux,default-trigger = "can0-rxtx";
+		};
+
+		can1_led {
+			label = "can1_led";
+			gpios = <&gpio0 106 0x0>;
+            		default-state = "off";
+            		linux,default-trigger = "can1-rxtx";
+		};
+
+		can2_led {
+			label = "can2_led";
+			gpios = <&gpio0 107 0x0>;
+            		default-state = "off";
+            		linux,default-trigger = "can2-rxtx";
+		};
+
+		can3_led {
+			label = "can3_led";
+			gpios = <&gpio0 108 0x0>;
+            		default-state = "off";
+            		linux,default-trigger = "can3-rxtx";
+		};
+
+		remote_led {
+			label = "remote_led";
+			gpios = <&gpio0 103 0x0>;
+			default-state = "off";
+			linux,default-trigger = "off";
+		};
+
+		motor_led {
+			label = "motor_led";
+			gpios = <&gpio0 102 0x0>;
+			default-state = "off";
+			linux,default-trigger = "off";
+		};
+
+		warning_led {
+			label = "warning_led";
+			gpios = <&gpio0 101 0x0>;
+			default-state = "off";
+			linux,default-trigger = "off";
+		};
+
+		battery_led {
+			label = "battery_led";
+			gpios = <&gpio0 100 0x0>;
+			default-state = "off";
+			linux,default-trigger = "off";
+		};
+
+		onoff_led {
+			label = "onoff_led";
+			gpios = <&gpio0 99 0x0>;
+			default-state = "off";
+			linux,default-trigger = "off";
+		};
+
+		r_led {
+			label = "r_led";
+			gpios = <&gpio0 91 0x0>;
+			default-state = "off";
+			linux,default-trigger = "heartbeat";
+		};
+
+		g_led {
+			label = "g_led";
+			gpios = <&gpio0 90 0x0>;
+			default-state = "off";
+			linux,default-trigger = "off";
+		};
+
+		y_led {
+			label = "y_led";
+			gpios = <&gpio0 89 0x0>;
+			default-state = "off";
+			linux,default-trigger = "off";
+			};
+	};
+
+	gpio-keys {
+		compatible="gpio-keys";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		autorepeat;
+
+		harakiri {
+			label = "GPIO Key F1 Harakiri";
+			gpios = <&gpio0 98 0>;
+			linux,code = <59>; /* F1 */
+			gpio-key,wakeup;
+			autorepeat;
+		};
+
+		PG5V {
+			label = "GPIO Key F7 PG5V";
+			gpios = <&gpio0 92 0>;
+			linux,code = <65>; /* F7 */
+			gpio-key,wakeup;
+			autorepeat;
+		};
+
+		pb2 {
+			label = "GPIO Key F8 pb2";
+			gpios = <&gpio0 88 0>;
+			linux,code = <66>; /* F8 */
+			gpio-key,wakeup;
+			autorepeat;
+		};
+
+		pb1 {
+			label = "GPIO Key F9 pb1";
+			gpios = <&gpio0 87 0>;
+			linux,code = <67>; /* F9 */
+			gpio-key,wakeup;
+			autorepeat;
+		};
+	};
+
+	adc_supply: fixedregulator {
+		compatible = "regulator-fixed";
+		regulator-name = "fixed-supply";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+	};
+
+};
+
+&gem0 {
+	local-mac-address = [00 0a 35 00 00 00];
+	phy-mode = "rgmii-id";
+	status = "okay";
+	xlnx,ptp-enet-clock = <0x69f6bcb>;
+};
+
+&gpio0 {
+	emio-gpio-width = <64>;
+	gpio-mask-high = <0x0>;
+	gpio-mask-low = <0x5600>;
+};
+
+&i2c0 {
+	clock-frequency = <400000>;
+	status = "okay";
+};
+
+&i2c1 {
+	clock-frequency = <400000>;
+	status = "okay";
+};
+
+&axi_iic_eeprom_temp {
+        eeprom: eeprom@50 {
+                compatible = "atmel,24c256";
+                reg = <0x50>;
+                pagesize = <64>;
+        };
+
+        temp1@39 {
+                compatible = "stts751";
+                reg = <0x39>;
+                has-event;
+                //has-therm;
+        };
+};
+
+&intc {
+	num_cpus = <2>;
+	num_interrupts = <96>;
+};
+
+&sdhci0 {
+	status = "okay";
+	xlnx,has-cd = <0x1>;
+	xlnx,has-power = <0x0>;
+	xlnx,has-wp = <0x1>;
+};
+
+&sdhci1 {
+	status = "okay";
+	xlnx,has-cd = <0x1>;
+	xlnx,has-power = <0x0>;
+	xlnx,has-wp = <0x1>;
+};
+
+&spi0 {
+	is-decoded-cs = <0>;
+	num-cs = <3>;
+	status = "okay";
+
+	ad7276@0 {
+		compatible = "adi,ad7276";
+		reg = <0>;
+		spi-max-frequency = <1000000>;
+		spi-cpha;
+		cpi-cpol;
+		vcc-supply = <&adc_supply>;
+	};
+};
+
+&spi1 {
+	is-decoded-cs = <0>;
+	num-cs = <3>;
+	status = "okay";
+
+	ad7276@0 {
+		compatible = "adi,ad7276";
+		reg = <0>;
+		spi-max-frequency = <1000000>;
+		spi-cpha;
+		cpi-cpol;
+		vcc-supply = <&adc_supply>;
+	};
+};
+
+&uart0 {
+	current-speed = <115200>;
+	device_type = "serial";
+	port-number = <0>;
+	status = "okay";
+};
+
+&uart1 {
+	current-speed = <115200>;
+	device_type = "serial";
+	port-number = <1>;
+	status = "okay";
+};
+
+&usb0 {
+	dr_mode = "host";
+	phy_type = "ulpi";
+	status = "okay";
+};
+
+&clkc {
+	fclk-enable = <0x1>;
+	ps-clk-frequency = <33333333>;
+};
