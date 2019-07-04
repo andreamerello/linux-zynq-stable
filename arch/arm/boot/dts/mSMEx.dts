@@ -1,0 +1,45 @@
+/dts-v1/;
+/include/ "trenz-te0720.dtsi"
+/* /include/ "zynq-msmex-pl.dtsi" */
+/ {
+
+	chosen {
+		bootargs = "console=ttyPS0,115200 root=/dev/mmcblk0p2 rw earlyprintk rootfstype=ext4 rootwait devtmpfs.mount=1";
+	};
+
+	aliases {
+		ethernet0 = &gem0;
+		serial0 = &uart0;
+		serial1 = &uart1;
+	};
+};
+
+&gem0 {
+	local-mac-address = [00 0a 35 00 00 00];
+	status = "okay";
+};
+
+&gpio0 {
+	emio-gpio-width = <64>;
+	gpio-mask-high = <0x0>;
+	gpio-mask-low = <0x5600>;
+};
+
+&sdhci0 {
+	status = "okay";
+	xlnx,has-cd = <0x1>;
+	xlnx,has-power = <0x0>;
+	xlnx,has-wp = <0x1>;
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&uart1 {
+	status = "okay";
+};
+
+&usb0 {
+	status = "okay";
+};
