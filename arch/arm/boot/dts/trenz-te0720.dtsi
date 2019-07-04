@@ -1,0 +1,56 @@
+/include/ "zynq-7000.dtsi"
+
+/ {
+	cpus {
+		cpu@0 {
+			operating-points = <666666 1000000 333333 1000000>;
+		};
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x0 0x40000000>;
+	};
+};
+
+&gem0 {
+	local-mac-address = [00 0a 35 00 00 00];
+	phy-mode = "rgmii-id";
+	xlnx,ptp-enet-clock = <0x69f6bcb>;
+};
+
+&gpio0 {
+	emio-gpio-width = <64>;
+	gpio-mask-high = <0x0>;
+	gpio-mask-low = <0x5600>;
+};
+
+&intc {
+	num_cpus = <2>;
+	num_interrupts = <96>;
+};
+
+/* on-board EMMC */
+&sdhci1 {
+	status = "okay";
+	xlnx,has-cd = <0x1>;
+	xlnx,has-power = <0x0>;
+	xlnx,has-wp = <0x1>;
+};
+
+&uart0 {
+	current-speed = <115200>;
+	device_type = "serial";
+	port-number = <0>;
+};
+
+&uart1 {
+	current-speed = <115200>;
+	device_type = "serial";
+	port-number = <1>;
+};
+
+&usb0 {
+	dr_mode = "host";
+	phy_type = "ulpi";
+};
